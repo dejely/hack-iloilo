@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { ChevronDown } from "lucide-react";
 import { Wordmark } from "@/components/brand";
 import {
   Card,
@@ -9,6 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayManila } from "@/lib/dates";
 import { municipalities } from "@/modules/accounts/queries";
@@ -63,27 +69,41 @@ async function OfferFormLoader() {
 export default function SellPage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-start gap-6 p-4">
-      <Wordmark className="h-8 w-auto text-primary" />
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Get a quote</CardTitle>
-          <CardDescription>
-            Today&apos;s buying price for your palay&apos;s moisture. An
-            estimate; the final price is set when we receive it.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<Skeleton className="h-48" />}>
-            <Quote />
-          </Suspense>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center gap-1">
+        <Wordmark className="h-8 w-auto text-primary" />
+        <p className="text-sm text-muted-foreground">
+          Iloilo Rice Processing Complex
+        </p>
+      </div>
+      {/* Closed by default: most sellers come to offer, the quote is optional. */}
+      <Collapsible className="w-full max-w-sm">
+        <Card>
+          <CardHeader>
+            <CollapsibleTrigger className="group/quote flex w-full items-center justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+              <CardTitle>Get a quote</CardTitle>
+              <ChevronDown
+                aria-hidden
+                className="size-4 text-muted-foreground transition-transform group-data-[panel-open]/quote:rotate-180"
+              />
+            </CollapsibleTrigger>
+            <CardDescription>
+              Estimate today&apos;s price from your palay&apos;s moisture.
+            </CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent>
+              <Suspense fallback={<Skeleton className="h-48" />}>
+                <Quote />
+              </Suspense>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Offer to sell palay</CardTitle>
           <CardDescription>
-            Iloilo Rice Processing Complex. The manager reviews your offer and
-            we text you the decision.
+            The manager reviews your offer and we text you the decision.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { saveFacility } from "../actions";
-import { InfoIcon, UnconfirmedIcon } from "./hint-icons";
+import { InfoIcon, UnconfirmedIcon } from "@/components/hint-icons";
 
 /** Pre-filled values in display units: tonnes, pesos, percent. */
 export type FacilityFormDefaults = {
@@ -32,7 +32,7 @@ export function FacilityForm({ defaults }: { defaults: FacilityFormDefaults }) {
   return (
     <form action={action} className="flex flex-col gap-6">
       <Section title="Capacity">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">
           <NumberField
             id="storageT"
             label="Storage (t)"
@@ -51,12 +51,13 @@ export function FacilityForm({ defaults }: { defaults: FacilityFormDefaults }) {
       </Section>
 
       <Section title="Costs" unconfirmed>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">
           <NumberField
             id="baseLoadKw"
             label="Base load kW"
             defaultValue={defaults.baseLoadKw}
             step={0.01}
+            info="Power the plant draws on any operating day apart from the machines, like lights, pumps and the office."
           />
           <NumberField
             id="tariff"
@@ -74,7 +75,7 @@ export function FacilityForm({ defaults }: { defaults: FacilityFormDefaults }) {
       </Section>
 
       <Section title="Planning">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3">
           <NumberField
             id="idleThresholdPct"
             label="Idle threshold %"
@@ -154,7 +155,7 @@ export function NumberField({
 }) {
   return (
     <Field>
-      <FieldLabel htmlFor={id}>
+      <FieldLabel htmlFor={id} className="whitespace-nowrap">
         {label}
         {info && <InfoIcon text={info} />}
         {unconfirmed && <UnconfirmedIcon />}

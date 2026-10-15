@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { DatePicker } from "@/components/date-picker";
+import { InfoIcon } from "@/components/hint-icons";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -8,6 +10,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { savePrice } from "../actions";
@@ -26,62 +30,68 @@ export type PriceFormDefaults = {
 
 export function PriceForm({ defaults }: { defaults: PriceFormDefaults }) {
   const [state, action, pending] = useActionState(savePrice, undefined);
+  const [effectiveDate, setEffectiveDate] = useState(defaults.effectiveDate);
 
   return (
     <form action={action}>
-      <FieldGroup>
+      <FieldGroup className="gap-5">
         <Field>
-          <FieldLabel htmlFor="effectiveDate">Effective date</FieldLabel>
-          <Input
+          <FieldLabel htmlFor="effectiveDate">
+            Effective date
+            <InfoIcon text="Prices apply from this date. If you save twice for one date, the latest save counts." />
+          </FieldLabel>
+          <DatePicker
             id="effectiveDate"
             name="effectiveDate"
-            type="date"
-            required
-            defaultValue={defaults.effectiveDate}
+            value={effectiveDate}
+            onChange={(value) => setEffectiveDate(value ?? "")}
           />
-          <FieldDescription>
-            Reads back on this date; the newest save for a date wins.
-          </FieldDescription>
         </Field>
 
         <Peso
           id="buyBase"
-          label="Palay buying base @ 25% MC"
+          label="Palay buying base"
+          info="Price per kg for palay at 25% moisture. Quotes adjust it for the actual moisture."
           defaultValue={defaults.buyBase}
           placeholder="21.00"
         />
 
-        <div className="grid grid-cols-3 gap-3">
-          <Factor
-            id="damaged"
-            label="Damaged"
-            defaultValue={defaults.damaged}
-          />
-          <Factor
-            id="immature"
-            label="Immature"
-            defaultValue={defaults.immature}
-          />
-          <Factor
-            id="foreign"
-            label="Foreign"
-            defaultValue={defaults.foreign}
-          />
-        </div>
-        <FieldDescription>
-          Deduction factors: fraction of the affected kilos removed.
-        </FieldDescription>
+        <FieldSet>
+          <FieldLegend variant="label" className="flex items-center gap-2">
+            Deductions
+            <InfoIcon text="Share of the affected kilos taken off the paid weight, from 0 to 1. For example, 0.25 removes a quarter." />
+          </FieldLegend>
+          <div className="grid grid-cols-3 gap-3">
+            <Factor
+              id="damaged"
+              label="Damaged"
+              defaultValue={defaults.damaged}
+            />
+            <Factor
+              id="immature"
+              label="Immature"
+              defaultValue={defaults.immature}
+            />
+            <Factor
+              id="foreign"
+              label="Foreign"
+              defaultValue={defaults.foreign}
+            />
+          </div>
+        </FieldSet>
 
         <div className="grid grid-cols-2 gap-3">
           <Peso
             id="drying"
             label="Drying fee"
+            info="Charged per kg to clients who bring palay for drying."
             defaultValue={defaults.drying}
             placeholder="1.60"
           />
           <Peso
             id="milling"
             label="Milling fee"
+            info="Charged per kg to clients who bring palay for milling."
             defaultValue={defaults.milling}
             placeholder="3.30"
           />
@@ -90,6 +100,7 @@ export function PriceForm({ defaults }: { defaults: PriceFormDefaults }) {
         <Peso
           id="rice"
           label="Rice selling price"
+          info="Price per kg of milled rice, sent to clients who text PRICE."
           defaultValue={defaults.rice}
           placeholder="47.00"
         />
@@ -112,17 +123,22 @@ export function PriceForm({ defaults }: { defaults: PriceFormDefaults }) {
 function Peso({
   id,
   label,
+  info,
   defaultValue,
   placeholder,
 }: {
   id: string;
   label: string;
+  info: string;
   defaultValue: string;
   placeholder?: string;
 }) {
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        {label} (₱/kg)
+        <InfoIcon text={info} />
+      </FieldLabel>
       <Input
         id={id}
         name={id}

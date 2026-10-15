@@ -195,7 +195,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
     it("reports unknown references", async () => {
       await inbound("CANCEL ZZZZZZ");
       expect((await lastReply()).body).toContain(
-        "Wala sang booking nga may ref",
+        "Wala sang booking nga may code",
       );
     });
 
@@ -470,7 +470,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       const booking = await book(`BOOK DRY 400 20/10 ±1 FOR ${beneficiary}`);
       const notFound = {
         status: "error",
-        message: "No booking matches that ref and phone.",
+        message: "No booking matches that code and phone.",
       };
       expect(await trackBooking({ ref: booking.ref, phone: stranger })).toEqual(
         notFound,
@@ -525,7 +525,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       for (let i = 0; i < 5; i++)
         expect(
           await trackBooking({ ref: booking.ref, phone: stranger }),
-        ).toMatchObject({ message: "No booking matches that ref and phone." });
+        ).toMatchObject({ message: "No booking matches that code and phone." });
       expect(
         await trackBooking({ ref: booking.ref, phone: stranger }),
       ).toMatchObject({ message: expect.stringContaining("Too many tries") });

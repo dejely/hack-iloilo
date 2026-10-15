@@ -233,7 +233,7 @@ export type TrackResult =
       fieldErrors?: Partial<Record<keyof TrackLookupInput, string>>;
     };
 
-const TRACK_NOT_FOUND = "No booking matches that ref and phone.";
+const TRACK_NOT_FOUND = "No booking matches that code and phone.";
 const TRACK_LOCKED = `Too many tries. Wait ${TRACK_WINDOW_MINUTES} minutes and try again.`;
 
 async function tracked(booking: Booking): Promise<TrackedBooking> {

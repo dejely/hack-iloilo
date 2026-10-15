@@ -1,3 +1,4 @@
+import { DateInput } from "@/components/date-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -66,16 +66,11 @@ export async function DispatchSummary({
           )}
           <Field className="w-auto">
             <FieldLabel htmlFor="dispatch-from">From</FieldLabel>
-            <Input
-              id="dispatch-from"
-              name="from"
-              type="date"
-              defaultValue={from}
-            />
+            <DateInput id="dispatch-from" name="from" defaultValue={from} />
           </Field>
           <Field className="w-auto">
             <FieldLabel htmlFor="dispatch-to">To</FieldLabel>
-            <Input id="dispatch-to" name="to" type="date" defaultValue={to} />
+            <DateInput id="dispatch-to" name="to" defaultValue={to} />
           </Field>
           <Button type="submit" variant="outline">
             Show

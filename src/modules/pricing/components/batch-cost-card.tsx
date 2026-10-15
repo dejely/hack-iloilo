@@ -1,3 +1,4 @@
+import { InfoIcon } from "@/components/hint-icons";
 import {
   Card,
   CardContent,
@@ -20,20 +21,35 @@ export async function BatchCostCard({ id }: { id: string }) {
       <CardHeader>
         <CardTitle>Cost and margin</CardTitle>
         <CardDescription>
-          Direct cost — electricity and labor — against revenue.
+          Electricity and labor against revenue.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           {(
             [
-              ["Electricity", formatMoney(cost.electricityMinor)],
-              ["Labor", formatMoney(cost.laborMinor)],
-              ["Revenue", formatMoney(cost.revenueMinor)],
-            ] as [string, string][]
-          ).map(([label, value]) => (
+              [
+                "Electricity",
+                formatMoney(cost.electricityMinor),
+                "Dryer and mill hours times their rated kW and the tariff. The plant's base load is left out.",
+              ],
+              [
+                "Labor",
+                formatMoney(cost.laborMinor),
+                "Drying and milling hours times the labor rate.",
+              ],
+              [
+                "Revenue",
+                formatMoney(cost.revenueMinor),
+                "Custom: the drying and milling fees. IRPC-owned: rice sales minus what IRPC paid for the palay.",
+              ],
+            ] as [string, string, string][]
+          ).map(([label, value, info]) => (
             <div key={label} className="contents">
-              <dt className="text-muted-foreground">{label}</dt>
+              <dt className="flex items-center gap-1 text-muted-foreground">
+                {label}
+                <InfoIcon text={info} />
+              </dt>
               <dd className="font-medium">{value}</dd>
             </div>
           ))}
@@ -44,7 +60,10 @@ export async function BatchCostCard({ id }: { id: string }) {
             </dd>
           </div>
           <div className="contents">
-            <dt className="text-muted-foreground">Margin per kg</dt>
+            <dt className="flex items-center gap-1 text-muted-foreground">
+              Margin per kg
+              <InfoIcon text="Margin divided by the kilos received." />
+            </dt>
             <dd className="font-medium">{formatMoney(cost.perKgMinor)}/kg</dd>
           </div>
         </dl>

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { bookingSms, describeBookingRequest } from "@/modules/booking/logic";
 import { buyingSms, formatVarietiesSms } from "@/modules/buying/logic";
 import { NOT_IN_LINE_REPLY, queueStatusReply } from "@/modules/gate/logic";
+import { orderSms } from "@/modules/orders/logic";
 import { idleDraft } from "@/modules/prescriptions/logic";
 import {
   aiConfirmText,
@@ -38,12 +39,16 @@ const usages = [
 ];
 
 // Kept per module: spreading them into one object would drop shared keys.
-const templates = Object.entries({ bookingSms, buyingSms, smsReplies }).flatMap(
-  ([group, replies]) =>
-    Object.entries(replies).map(([key, template]): [string, string] => [
-      `${group}.${key}`,
-      fillTemplate(template, longVars),
-    ]),
+const templates = Object.entries({
+  bookingSms,
+  buyingSms,
+  orderSms,
+  smsReplies,
+}).flatMap(([group, replies]) =>
+  Object.entries(replies).map(([key, template]): [string, string] => [
+    `${group}.${key}`,
+    fillTemplate(template, longVars),
+  ]),
 );
 
 const texts: [string, string][] = [

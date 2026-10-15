@@ -1,11 +1,13 @@
 "use client";
 
+import { ServiceIcon } from "@/components/service-icon";
 import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { CalendarSearch, ImageDown } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@/components/date-picker";
+import { InfoIcon } from "@/components/hint-icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -91,9 +93,9 @@ export function WebBookingForm({ today }: { today: string }) {
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
-          We texted this ref to your phone. Show it at the gate. To cancel, text{" "}
-          <span className="font-mono">CANCEL {booked.ref}</span>, or manage it
-          online.
+          We texted this code to your phone. Show it at the gate. To cancel,
+          text <span className="font-mono">CANCEL {booked.ref}</span>, or manage
+          it online.
         </p>
         <Button
           type="button"
@@ -175,7 +177,7 @@ export function WebBookingForm({ today }: { today: string }) {
             aria-invalid={!!errors.phone}
             disabled={pending}
           />
-          <FieldDescription>We text your booking ref here.</FieldDescription>
+          <FieldDescription>We text your booking code here.</FieldDescription>
           <FieldError errors={[errors.phone]} />
         </Field>
         <Controller
@@ -199,12 +201,22 @@ export function WebBookingForm({ today }: { today: string }) {
                   aria-invalid={!!fieldState.error}
                   className="w-full"
                 >
-                  <SelectValue />
+                  <SelectValue>
+                    {(value: (typeof services)[number] | null) =>
+                      value ? (
+                        <>
+                          <ServiceIcon kind={value} />
+                          {serviceLabels[value]}
+                        </>
+                      ) : null
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     {serviceItems.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
+                        <ServiceIcon kind={item.value} />
                         {item.label}
                       </SelectItem>
                     ))}
@@ -249,7 +261,10 @@ export function WebBookingForm({ today }: { today: string }) {
           )}
         />
         <Field data-invalid={!!errors.flexDays}>
-          <FieldLabel htmlFor={`${formId}-flex`}>Flex days</FieldLabel>
+          <FieldLabel htmlFor={`${formId}-flex`}>
+            Flex days
+            <InfoIcon text="If your day fills up, we may move you within these days instead of turning you away." />
+          </FieldLabel>
           <Input
             id={`${formId}-flex`}
             type="number"

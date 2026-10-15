@@ -1,7 +1,9 @@
 import {
   ArrowRight,
   CalendarSearch,
+  LogIn,
   MessageSquareText,
+  ShoppingBasket,
   Wheat,
   Wind,
 } from "lucide-react";
@@ -30,7 +32,7 @@ const SMS_COMMANDS = [
   { text: "QUOTE 14% 1000", does: "Price for 1,000 kg at 14% moisture" },
   { text: "SELL 1000 RC222 20/10", does: "Offer 1,000 kg of RC222 on Oct 20" },
   { text: "VARIETIES", does: "Variety codes we buy" },
-  { text: "CANCEL ABC123", does: "Cancel a booking by its ref" },
+  { text: "CANCEL ABC123", does: "Cancel a booking by its code" },
 ];
 
 /** Today's public prices; hidden if none are set. */
@@ -86,10 +88,8 @@ export default function LandingPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 p-4 pb-10">
       <header className="flex items-center justify-between gap-4">
         <Wordmark className="h-7 w-auto text-primary" />
-        <Link
-          href="/login"
-          className={buttonVariants({ variant: "ghost", size: "sm" })}
-        >
+        <Link href="/login" className={buttonVariants({ variant: "outline" })}>
+          <LogIn data-icon="inline-start" />
           Staff sign in
         </Link>
       </header>
@@ -147,6 +147,23 @@ export default function LandingPage() {
             <span className="text-lg font-semibold">Track a booking</span>
             <span className="text-sm text-muted-foreground">
               Check your place in line, move or cancel.
+            </span>
+          </span>
+          <ArrowRight className="size-5 shrink-0" aria-hidden />
+        </Link>
+
+        <Link
+          href="/buy"
+          className="flex items-center gap-4 rounded-xl border p-4"
+        >
+          <ShoppingBasket
+            className="size-8 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <span className="flex flex-1 flex-col">
+            <span className="text-lg font-semibold">Buy rice</span>
+            <span className="text-sm text-muted-foreground">
+              Today&apos;s price and where your rice came from.
             </span>
           </span>
           <ArrowRight className="size-5 shrink-0" aria-hidden />

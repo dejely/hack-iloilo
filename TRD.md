@@ -117,6 +117,7 @@ erDiagram
   clients ||--o{ bookings : ""
   clients ||--o{ queue_entries : ""
   clients ||--o{ sell_offers : ""
+  clients ||--o{ rice_orders : "buyer"
   bookings |o--o{ queue_entries : "checked in as"
   sell_offers |o--o{ queue_entries : "checked in as"
   batches ||--o| purchases : "bought as"
@@ -229,7 +230,9 @@ stateDiagram-v2
 
 Any command accepts `FOR <phone>`.
 
-### M5. Buying
+### M5. Selling
+
+Code lives in `src/modules/buying`; the staff page is `/selling` (`/buying` redirects).
 
 | Table         | Columns                                                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -254,7 +257,7 @@ Any command accepts `FOR <phone>`.
 | Quote   | `QUOTE <mc>% [<kg>]`          | `QUOTE 23% 5000`        |
 | Sell    | `SELL <kg> <variety> <dd/mm>` | `SELL 3000 RC222 25/10` |
 
-`SELL` accepts `FOR <phone>`. Accepted offers feed M9.
+`SELL` accepts `FOR <phone>`. Accepted offers feed M9. `decideOffer` texts the seller the decision.
 
 **Tests:** IRPC's sample form (8,763 kg × ₱21 = ₱184,023), MC above and below 25%, and each deduction.
 
@@ -349,6 +352,24 @@ No tables. **Export:** `capacityByDay(from, to)` returns per day and pool (`drye
 - **Store, mill later (P1):** move mill overflow into storage, then fill the nearest idle mill days.
 
 **Tests:** a 30 t overflow with three flexible bookings, idle-day recipients, and the template note.
+
+### M11. Rice Buying
+
+Code lives in `src/modules/orders`. See [decision 0003](docs/decisions/0003-buyer-requests-in-scope.md).
+
+| Table         | Columns                                                                                                                                             |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rice_orders` | `ref`, `client_id`, `booked_by_phone`, `kg`, `pickup_date`, `status` (`requested`, `accepted`, `declined`, `cancelled`, `picked_up`), `dispatch_id` |
+
+**Exports:** `createOrder(input)`, `trackedOrder(ref, phone)`, `cancelOrder(order)`, `listOrders(status?)`, `orderStock()`.
+
+**Flow:** `/buy` → `requestRiceOnline` registers or finds the buyer (`kind: buyer`, with their `buyer_type`) and texts the code. The manager accepts or declines on `/rice-buying`; staff cancel, or record the pickup: `pickUpOrder` calls M6 `dispatch()` from a batch in `riceBatchesForSale()` and saves its id as `rice_orders.dispatch_id`. `/buy/track` (code + phone) shows the status and cancels while `requested` or `accepted`; failed lookups share M4's `track_attempts` lock. Requests are limited to 3 per phone and 10 per IP an hour (`request_attempts`). Every change texts the buyer.
+
+**Price and stock:** the estimate is `kg × rice_minor_per_kg` (M7); the dispatch (M6) sets the real price. No payment and no stock lock: `/rice-buying` shows free kg = M6 `riceStock()` − accepted kg, and flags open requests above it.
+
+**Public trace:** M6 `publicBatchTrail(batchNo)` finds only IRPC-owned batches with a dispatch and reads only dates, variety and origin. `traceOrigin` shows the co-op, else "<municipality> farmers", never a person.
+
+**Tests:** cancel rules, estimate, free kg and the over-free flag, trace origin, and every text within one GSM-7 SMS.
 
 ## Testing and CI
 

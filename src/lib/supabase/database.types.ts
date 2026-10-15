@@ -369,6 +369,52 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"request_attempts": {
+                  Row: {
+                    "created_at": string,"id": string,"ip": string,"phone": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"ip": string,"phone": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"ip"?: string,"phone"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"rice_orders": {
+                  Row: {
+                    "booked_by_phone": string,"client_id": string,"created_at": string,"dispatch_id": string | null,"facility_id": string,"id": string,"kg": number,"pickup_date": string,"ref": string,"status": Database["public"]['Enums']["rice_order_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "booked_by_phone": string,"client_id": string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id": string,"id"?: string,"kg": number,"pickup_date": string,"ref": string,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "booked_by_phone"?: string,"client_id"?: string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id"?: string,"id"?: string,"kg"?: number,"pickup_date"?: string,"ref"?: string,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rice_orders_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rice_orders_dispatch_id_fkey"
+      columns: ["dispatch_id"]
+isOneToOne: false
+      referencedRelation: "dispatches"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rice_orders_facility_id_fkey"
+      columns: ["facility_id"]
+isOneToOne: false
+      referencedRelation: "facilities"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"sell_offers": {
                   Row: {
                     "booked_by_phone": string,"client_id": string,"created_at": string,"est_kg": number,"facility_id": string,"harvest_date": string,"id": string,"ref": string,"status": Database["public"]['Enums']["sell_offer_status"],"updated_at": string,"variety_id": string | null
@@ -512,7 +558,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "batch_ownership": "custom"|"irpc","batch_stage": "received"|"drying"|"stored"|"milling"|"milled"|"dispatched","booking_channel": "sms"|"staff","booking_status": "confirmed"|"reschedule_proposed"|"arrived"|"cancelled"|"no_show","buyer_type": "wholesaler"|"retailer"|"institutional"|"cooperative"|"drop_point"|"subsidy_program","client_kind": "farmer"|"coop"|"trader"|"buyer","forecast_source": "opa-2025"|"demo-synthetic","machine_type": "dryer"|"mill","prescription_kind": "move_bookings"|"fill_idle"|"mill_full_loads"|"store_mill_later","prescription_status": "accepted"|"dismissed","queue_status": "waiting"|"serving"|"done"|"left","sell_offer_status": "offered"|"accepted"|"declined"|"arrived"|"withdrawn","service": "drying"|"milling","sms_direction": "inbound"|"outbound","sms_prompt_kind": "ai_confirm"|"reschedule"|"weight_confirm","sms_prompt_status": "open"|"accepted"|"declined"|"expired","sms_status": "received"|"processed"|"queued"|"sent"|"failed","staff_role": "encoder"|"manager"
+            "batch_ownership": "custom"|"irpc","batch_stage": "received"|"drying"|"stored"|"milling"|"milled"|"dispatched","booking_channel": "sms"|"staff","booking_status": "confirmed"|"reschedule_proposed"|"arrived"|"cancelled"|"no_show","buyer_type": "wholesaler"|"retailer"|"institutional"|"cooperative"|"drop_point"|"subsidy_program","client_kind": "farmer"|"coop"|"trader"|"buyer","forecast_source": "opa-2025"|"demo-synthetic","machine_type": "dryer"|"mill","prescription_kind": "move_bookings"|"fill_idle"|"mill_full_loads"|"store_mill_later","prescription_status": "accepted"|"dismissed","queue_status": "waiting"|"serving"|"done"|"left","rice_order_status": "requested"|"accepted"|"declined"|"cancelled"|"picked_up","sell_offer_status": "offered"|"accepted"|"declined"|"arrived"|"withdrawn","service": "drying"|"milling","sms_direction": "inbound"|"outbound","sms_prompt_kind": "ai_confirm"|"reschedule"|"weight_confirm","sms_prompt_status": "open"|"accepted"|"declined"|"expired","sms_status": "received"|"processed"|"queued"|"sent"|"failed","staff_role": "encoder"|"manager"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -632,7 +678,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "batch_ownership": ["custom", "irpc"],"batch_stage": ["received", "drying", "stored", "milling", "milled", "dispatched"],"booking_channel": ["sms", "staff"],"booking_status": ["confirmed", "reschedule_proposed", "arrived", "cancelled", "no_show"],"buyer_type": ["wholesaler", "retailer", "institutional", "cooperative", "drop_point", "subsidy_program"],"client_kind": ["farmer", "coop", "trader", "buyer"],"forecast_source": ["opa-2025", "demo-synthetic"],"machine_type": ["dryer", "mill"],"prescription_kind": ["move_bookings", "fill_idle", "mill_full_loads", "store_mill_later"],"prescription_status": ["accepted", "dismissed"],"queue_status": ["waiting", "serving", "done", "left"],"sell_offer_status": ["offered", "accepted", "declined", "arrived", "withdrawn"],"service": ["drying", "milling"],"sms_direction": ["inbound", "outbound"],"sms_prompt_kind": ["ai_confirm", "reschedule", "weight_confirm"],"sms_prompt_status": ["open", "accepted", "declined", "expired"],"sms_status": ["received", "processed", "queued", "sent", "failed"],"staff_role": ["encoder", "manager"]
+            "batch_ownership": ["custom", "irpc"],"batch_stage": ["received", "drying", "stored", "milling", "milled", "dispatched"],"booking_channel": ["sms", "staff"],"booking_status": ["confirmed", "reschedule_proposed", "arrived", "cancelled", "no_show"],"buyer_type": ["wholesaler", "retailer", "institutional", "cooperative", "drop_point", "subsidy_program"],"client_kind": ["farmer", "coop", "trader", "buyer"],"forecast_source": ["opa-2025", "demo-synthetic"],"machine_type": ["dryer", "mill"],"prescription_kind": ["move_bookings", "fill_idle", "mill_full_loads", "store_mill_later"],"prescription_status": ["accepted", "dismissed"],"queue_status": ["waiting", "serving", "done", "left"],"rice_order_status": ["requested", "accepted", "declined", "cancelled", "picked_up"],"sell_offer_status": ["offered", "accepted", "declined", "arrived", "withdrawn"],"service": ["drying", "milling"],"sms_direction": ["inbound", "outbound"],"sms_prompt_kind": ["ai_confirm", "reschedule", "weight_confirm"],"sms_prompt_status": ["open", "accepted", "declined", "expired"],"sms_status": ["received", "processed", "queued", "sent", "failed"],"staff_role": ["encoder", "manager"]
           }
         }
 } as const

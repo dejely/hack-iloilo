@@ -15,7 +15,7 @@
   );
   --on-grain: var(--brand-secondary);
   --flame: #e8762c;
-  --grid: color-mix(in oklch, var(--border) 45%, transparent);
+  --grid: color-mix(in oklch, var(--border) 25%, transparent);
 }
 
 .plant-view [data-s="ok"] {
@@ -117,13 +117,6 @@
   font-size: 6.5px;
   letter-spacing: 0.08em;
   fill: var(--muted-foreground);
-}
-.plant-sheet .ttl {
-  font-family: var(--font-mono);
-  font-size: 7px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  fill: var(--ink);
 }
 .plant-sheet .lvl {
   font-family: var(--font-mono);

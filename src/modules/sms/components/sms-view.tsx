@@ -4,8 +4,8 @@ import { InfoIcon, SendIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { splitManila } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { simulateInbound } from "../actions";
+import { smsStatusLabels, smsStatusTones } from "../logic";
 import type { SmsMessage } from "../queries";
 
 const REFRESH_MS = 5000;
@@ -248,7 +249,9 @@ function Phone({
                   {formatTime(message.created_at)}
                   {message.status !== "processed" &&
                     message.status !== "sent" && (
-                      <Badge variant="outline">{message.status}</Badge>
+                      <StatusBadge tone={smsStatusTones[message.status]}>
+                        {smsStatusLabels[message.status]}
+                      </StatusBadge>
                     )}
                 </span>
               </MessageContent>

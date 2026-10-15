@@ -1,8 +1,10 @@
 "use client";
 
+import { ServiceIcon, ServiceLabel } from "@/components/service-icon";
 import { Pencil, Plus } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
-import { Badge } from "@/components/ui/badge";
+import { OptionSelect } from "@/components/option-select";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,10 +21,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -40,7 +38,12 @@ import {
 } from "../actions";
 import type { Machine } from "../queries";
 import { NumberField } from "./facility-form";
-import { UnconfirmedIcon } from "./hint-icons";
+import { UnconfirmedIcon } from "@/components/hint-icons";
+
+const machineTypes = [
+  { value: "dryer", label: "Dryer", icon: <ServiceIcon kind="dryer" /> },
+  { value: "mill", label: "Mill", icon: <ServiceIcon kind="mill" /> },
+];
 
 const t = (kg: number | null) => (kg == null ? "" : String(kg / 1000));
 
@@ -100,10 +103,16 @@ export function MachinesTable({ machines }: { machines: Machine[] }) {
               <TableCell className="font-medium">
                 <span className="flex items-center gap-2">
                   {m.code}
-                  {!m.active && <Badge variant="secondary">Inactive</Badge>}
+                  {!m.active && (
+                    <StatusBadge tone="neutral">Inactive</StatusBadge>
+                  )}
                 </span>
               </TableCell>
-              <TableCell className="capitalize">{m.type}</TableCell>
+              <TableCell>
+                <ServiceLabel kind={m.type}>
+                  {m.type === "dryer" ? "Dryer" : "Mill"}
+                </ServiceLabel>
+              </TableCell>
               <TableCell className="text-right">
                 {m.type === "dryer"
                   ? `${formatTonnes(m.capacity_kg ?? 0)}/load`
@@ -189,16 +198,13 @@ function MachineForm({
         <div className="grid grid-cols-2 gap-3">
           <Field>
             <FieldLabel htmlFor="type">Type</FieldLabel>
-            <NativeSelect
+            <OptionSelect
               id="type"
               name="type"
-              className="w-full"
+              options={machineTypes}
               value={type}
-              onChange={(e) => setType(e.target.value as Machine["type"])}
-            >
-              <NativeSelectOption value="dryer">Dryer</NativeSelectOption>
-              <NativeSelectOption value="mill">Mill</NativeSelectOption>
-            </NativeSelect>
+              onChange={(value) => setType(value as Machine["type"])}
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="code">Code</FieldLabel>
@@ -220,6 +226,7 @@ function MachineForm({
               label="Load (t)"
               defaultValue={t(machine?.capacity_kg ?? null)}
               step={0.001}
+              info="Palay one batch holds. Daily capacity counts only whole loads."
               unconfirmed
             />
             <NumberField
@@ -227,6 +234,7 @@ function MachineForm({
               label="Cycle hours"
               defaultValue={machine?.cycle_hours?.toString() ?? ""}
               step={0.1}
+              info="Hours to dry one load, from loading to unloading."
               unconfirmed
             />
           </div>
@@ -236,6 +244,7 @@ function MachineForm({
             label="Throughput (t/hour)"
             defaultValue={t(machine?.kg_per_hour ?? null)}
             step={0.001}
+            info="Palay the mill takes in per hour of running."
             unconfirmed
           />
         )}
@@ -245,6 +254,7 @@ function MachineForm({
           label="Rated kW"
           defaultValue={machine?.rated_kw.toString() ?? "0"}
           step={0.01}
+          info="Power the machine draws while running, from its nameplate. Used for electricity cost."
           unconfirmed
         />
 

@@ -3,6 +3,25 @@
 
 import { z } from "zod";
 import { formatKg, formatMoneySms } from "@/lib/format";
+import type { StatusTone } from "@/lib/status";
+import type { Database } from "@/lib/supabase/database.types";
+
+type OfferStatus = Database["public"]["Enums"]["sell_offer_status"];
+
+export const offerStatusLabels: Record<OfferStatus, string> = {
+  offered: "Offered",
+  accepted: "Accepted",
+  arrived: "Arrived",
+  declined: "Declined",
+  withdrawn: "Withdrawn",
+};
+export const offerStatusTones: Record<OfferStatus, StatusTone> = {
+  offered: "warning",
+  accepted: "info",
+  arrived: "success",
+  declined: "danger",
+  withdrawn: "neutral",
+};
 
 type PurchasePrice = {
   paid_kg: number;
@@ -126,7 +145,11 @@ export const buyingSms = {
   unknownVariety:
     'IRPC: Wala namon nakilala ang variety "{code}". Palihog i-check ang code kag tilawi liwat. I-text ang VARIETIES para sa listahan.',
   offerRecorded:
-    "IRPC: Nalista na ang offer mo. Ref {ref}: {kg} {variety} para sa harvest sa {date}. I-text ka namon kon may desisyon na ang manager.",
+    "IRPC: Nalista na ang offer mo. Code {ref}: {kg} {variety} para sa harvest sa {date}. I-text ka namon kon may desisyon na ang manager.",
+  offerAccepted:
+    "IRPC: Accepted ang offer {ref}: {kg} palay, harvest sa {date}. Dal-a sa IRPC, Amamaros, Pototan kag ipakita ang code sa gate.",
+  offerDeclined:
+    "IRPC: Pasensya, indi mabakal ang offer {ref} ({kg}, {date}). I-text ang PRICE para sa presyo subong.",
 } as const;
 
 /**

@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { InfoIcon } from "@/components/hint-icons";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,10 @@ export function VoucherForm({
       }}
     >
       <Field className="flex-1">
-        <FieldLabel htmlFor={fieldId}>Voucher no.</FieldLabel>
+        <FieldLabel htmlFor={fieldId}>
+          Voucher no.
+          <InfoIcon text="Number on the payment voucher, added once the client is paid." />
+        </FieldLabel>
         <Input
           id={fieldId}
           value={value}

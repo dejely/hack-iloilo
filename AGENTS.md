@@ -15,7 +15,7 @@ src/
   app/api/          route handlers (SMS inbound webhook)
   components/ui/    shadcn/ui components (generated; edit sparingly)
   components/       app-level components (sidebar, nav, placeholders)
-  modules/<name>/   one per PRD module (M1–M10): logic.ts, queries.ts, actions.ts, sms.ts, components/
+  modules/<name>/   one per PRD module (M1–M11): logic.ts, queries.ts, actions.ts, sms.ts, components/
   lib/              env, Supabase clients, SMS gateway, AI helper, dates, formatters, refs
   proxy.ts          session refresh and login redirect
 supabase/           config, migrations, seeds/ (local dev via Docker)
@@ -25,7 +25,7 @@ services/sms-webhook/  SMSGate webhook relay (separate Vercel project)
 infra/sms-gateway/  Optional self-hosted SMSGate server (Docker Compose)
 ```
 
-Module folders: `setup` (M1), `accounts` (M2), `sms` (M3), `booking` (M4), `buying` (M5), `gate` (M6), `pricing` (M7), `forecast` (M8), `capacity` (M9), `prescriptions` (M10).
+Module folders: `setup` (M1), `accounts` (M2), `sms` (M3), `booking` (M4), `buying` (M5), `gate` (M6), `pricing` (M7), `forecast` (M8), `capacity` (M9), `prescriptions` (M10), `orders` (M11).
 
 ## Tech Stack
 

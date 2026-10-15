@@ -17,6 +17,7 @@ vi.mock("@/modules/accounts/queries", () => ({
 }));
 vi.mock("./queries", () => ({
   createOffer: vi.fn(),
+  notifyOfferDecision: vi.fn(),
   notifyOfferRecorded: vi.fn(),
 }));
 import { revalidatePath } from "next/cache";
@@ -25,8 +26,13 @@ import {
   ClientInputError,
   findOrRegisterByPhone,
 } from "@/modules/accounts/queries";
-import { offerOnline } from "./actions";
-import { createOffer, notifyOfferRecorded } from "./queries";
+import { db } from "@/lib/supabase/admin";
+import { decideOffer, offerOnline } from "./actions";
+import {
+  createOffer,
+  notifyOfferDecision,
+  notifyOfferRecorded,
+} from "./queries";
 
 beforeEach(() => vi.resetAllMocks());
 
@@ -69,7 +75,7 @@ it("records an offer online without staff auth, for the entered phone", async ()
     bookedByPhone: "+639171234567",
   });
   expect(notifyOfferRecorded).toHaveBeenCalledWith(offer, "+639171234567");
-  expect(revalidatePath).toHaveBeenCalledWith("/buying");
+  expect(revalidatePath).toHaveBeenCalledWith("/selling");
 });
 
 it("records a blank variety as unknown and accepts today's harvest date", async () => {
@@ -143,4 +149,30 @@ it("returns a retry message when saving fails", async () => {
     message: "Unable to save the offer. Please try again.",
   });
   expect(notifyOfferRecorded).not.toHaveBeenCalled();
+});
+
+/** A `sell_offers` update chain that resolves to `row` (null: no longer `offered`). */
+function mockOfferUpdate(row: unknown) {
+  const chain = {
+    update: () => chain,
+    eq: () => chain,
+    select: () => chain,
+    maybeSingle: async () => ({ data: row, error: null }),
+  };
+  vi.mocked(db).mockReturnValue({ from: () => chain } as never);
+}
+
+it("texts the seller when the manager decides an offer", async () => {
+  const offer = { id: "offer-1", status: "accepted" };
+  mockOfferUpdate(offer);
+  await decideOffer("offer-1", true);
+  expect(requireRole).toHaveBeenCalledWith("manager");
+  expect(notifyOfferDecision).toHaveBeenCalledWith(offer, true);
+});
+
+it("texts no one when the offer was already decided", async () => {
+  mockOfferUpdate(null);
+  await decideOffer("offer-1", false);
+  expect(notifyOfferDecision).not.toHaveBeenCalled();
+  expect(revalidatePath).toHaveBeenCalledWith("/selling");
 });

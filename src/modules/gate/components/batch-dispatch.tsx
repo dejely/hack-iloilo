@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -84,8 +85,10 @@ export async function BatchDispatch({ id }: { id: string }) {
                   className="flex flex-col gap-1 border-l-2 border-muted pl-4 text-sm"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-medium">
-                      {formatKg(d.kg)} → {d.buyer.name}
+                    <span className="inline-flex items-center gap-1 font-medium">
+                      {formatKg(d.kg)}
+                      <ArrowRight aria-label="to" className="size-3.5" />
+                      {d.buyer.name}
                     </span>
                     <span className="text-muted-foreground">
                       {d.price_minor_per_kg > 0

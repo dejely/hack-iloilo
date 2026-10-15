@@ -1,8 +1,10 @@
 "use client";
 
+import { ServiceIcon, isServiceIconKind } from "@/components/service-icon";
 import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
+import { InfoIcon } from "@/components/hint-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,7 +16,13 @@ import {
 import { addDays } from "@/lib/dates";
 import { formatTonnes } from "@/lib/format";
 import { cn } from "cn";
-import { dayLabel, expectedKg, plantStatus, type PlantStatus } from "../logic";
+import {
+  dayLabel,
+  expectedKg,
+  plantStatus,
+  plantStatusTones,
+  type PlantStatus,
+} from "../logic";
 import type { DayPool, Pool } from "../types";
 import {
   DryerDrawing,
@@ -173,7 +181,6 @@ export function PlantView({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-semibold">{dayLabel(selected)}</h2>
           {flagged.length ? (
             flagged.map((x) => (
               <Chip key={x.pool} status={x.status}>
@@ -224,20 +231,8 @@ function PoolUnit({
   const forecast = day.load.forecast.mid;
   const level = day.capacityKg ? expectedKg(day) / day.capacityKg : 0;
   const drawing = {
-    dryer: (
-      <DryerDrawing
-        level={level}
-        overKg={day.overflowKg}
-        capacityKg={day.capacityKg}
-      />
-    ),
-    storage: (
-      <SiloDrawing
-        level={level}
-        overKg={day.overflowKg}
-        capacityKg={day.capacityKg}
-      />
-    ),
+    dryer: <DryerDrawing level={level} overKg={day.overflowKg} />,
+    storage: <SiloDrawing level={level} overKg={day.overflowKg} />,
     mill: <MillDrawing level={level} />,
   }[pool];
   return (
@@ -260,6 +255,9 @@ function PoolUnit({
                 onClick={onOpen}
                 className="flex items-center gap-1 outline-none after:absolute after:inset-0 after:z-10"
               >
+                {isServiceIconKind(pool) ? (
+                  <ServiceIcon kind={pool} className="size-4 text-primary" />
+                ) : null}
                 {names[pool]}
                 <ArrowUpRight
                   aria-hidden
@@ -279,8 +277,12 @@ function PoolUnit({
                 {formatTonnes(firm)}
               </span>
               <span className="text-sm text-muted-foreground">
-                {forecast > 0 && ` + ${formatTonnes(forecast)} fcst`} of{" "}
+                {forecast > 0 && ` + ${formatTonnes(forecast)} forecast`} of{" "}
                 {formatTonnes(day.capacityKg)}
+              </span>
+              {/* Above the card's stretched link, so it can be tapped. */}
+              <span className="relative z-20 ml-1 inline-flex align-middle">
+                <InfoIcon text="The big figure is firm: bookings and offers. Forecast is palay the harvest forecast expects that isn't booked yet." />
               </span>
             </div>
             <Chip status={status}>
@@ -362,16 +364,7 @@ function Chip({
   status: PlantStatus;
   children: React.ReactNode;
 }) {
-  return (
-    <Badge
-      data-s={status}
-      variant="secondary"
-      className="h-6 gap-1.5 rounded-full bg-[color-mix(in_oklch,var(--s)_16%,transparent)] px-2.5 font-semibold text-foreground"
-    >
-      <span className="size-1.5 rounded-full bg-(--s)" />
-      {children}
-    </Badge>
-  );
+  return <StatusBadge tone={plantStatusTones[status]}>{children}</StatusBadge>;
 }
 
 function Legend() {

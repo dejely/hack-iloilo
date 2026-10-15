@@ -96,6 +96,29 @@ export async function notifyOfferRecorded(
   }
 }
 
+/**
+ * Texts the seller the manager's decision on an offer. A failed text never
+ * fails the saved decision.
+ */
+export async function notifyOfferDecision(
+  offer: Offer,
+  accepted: boolean,
+): Promise<void> {
+  try {
+    await send(
+      offer.booked_by_phone,
+      accepted ? buyingSms.offerAccepted : buyingSms.offerDeclined,
+      {
+        ref: offer.ref,
+        kg: formatKg(offer.est_kg),
+        date: formatDate(offer.harvest_date),
+      },
+    );
+  } catch (error) {
+    console.error("Unable to send offer decision", error);
+  }
+}
+
 /** An offer joined with its client and variety, for the buying list. */
 export type OfferListItem = Offer & {
   client: { name: string; phone: string } | null;

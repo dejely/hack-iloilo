@@ -7,6 +7,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { InfoIcon } from "@/components/hint-icons";
 import { Input } from "@/components/ui/input";
 import { formatKg, formatMoney } from "@/lib/format";
 import { type PriceRule, quote } from "../logic";
@@ -34,7 +35,10 @@ export function QuoteCalculator({ priceRule }: { priceRule: PriceRule }) {
   return (
     <FieldGroup>
       <Field>
-        <FieldLabel htmlFor="quoteMc">Estimated MC (%)</FieldLabel>
+        <FieldLabel htmlFor="quoteMc">
+          Estimated MC (%)
+          <InfoIcon text="Moisture the palay is expected to have. The real moisture is measured at receiving and sets the final price." />
+        </FieldLabel>
         <Input
           id="quoteMc"
           type="number"
@@ -59,7 +63,7 @@ export function QuoteCalculator({ priceRule }: { priceRule: PriceRule }) {
           value={kgInput}
           onChange={(e) => setKgInput(e.target.value)}
         />
-        <FieldDescription>Optional — for an estimated total.</FieldDescription>
+        <FieldDescription>Optional, for an estimated total.</FieldDescription>
       </Field>
 
       {result && (

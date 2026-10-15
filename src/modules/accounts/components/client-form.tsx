@@ -2,6 +2,7 @@
 import { useId, useState, useTransition } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { InfoIcon } from "@/components/hint-icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -342,6 +343,7 @@ export function ClientForm({
               <Field data-invalid={!!fieldState.error}>
                 <FieldLabel htmlFor={`${formId}-buyer-type`}>
                   Buyer type
+                  <InfoIcon text="Shows where IRPC's rice goes, in batch trails and reports. Institutional: schools, hospitals and offices. Drop-point: a municipality's distribution point." />
                 </FieldLabel>
                 <Select
                   items={buyerTypeItems}

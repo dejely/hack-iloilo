@@ -23,13 +23,17 @@ async function BookingFormLoader() {
 export default function BookPage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-start gap-6 p-4 sm:justify-center">
-      <Wordmark className="h-8 w-auto text-primary" />
+      <div className="flex flex-col items-center gap-1">
+        <Wordmark className="h-8 w-auto text-primary" />
+        <p className="text-sm text-muted-foreground">
+          Iloilo Rice Processing Complex
+        </p>
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Book drying or milling</CardTitle>
           <CardDescription>
-            Iloilo Rice Processing Complex. Your booking is confirmed right
-            away.
+            Your booking is confirmed right away.
           </CardDescription>
         </CardHeader>
         <CardContent>

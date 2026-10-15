@@ -168,21 +168,18 @@ describe("templateNote", () => {
       today: "2026-10-18",
     })[0];
 
-  it("words a cleared overflow from the facts", () => {
+  it("words the move from the facts", () => {
     const p = rx([
       booking("AAAAAA", 20_000, "2026-10-19", 1),
       booking("BBBBBB", 10_000, "2026-10-19", 1),
     ]);
-    expect(templateNote(p)).toBe(
-      "Moving 2 flexible bookings to Oct 18–20 clears it without turning anyone away.",
-    );
+    expect(templateNote(p)).toBe("Move 2 flexible bookings to Oct 18–20.");
   });
 
-  it("states what is left over", () => {
+  it("leaves the remainder to its badge", () => {
     const p = rx([booking("AAAAAA", 20_000, "2026-10-19", 1)]);
-    expect(templateNote(p)).toBe(
-      "Moving 1 flexible booking to Oct 20 leaves 10 t over.",
-    );
+    expect(templateNote(p)).toBe("Move 1 flexible booking to Oct 20.");
+    expect(p.remainderKg).toBe(10_000);
   });
 });
 
@@ -331,9 +328,7 @@ describe("millFullLoads", () => {
       full_per_kg: "₱0.38",
       saving_per_kg: "₱0.17",
     });
-    expect(templateNote(rx)).toBe(
-      "Base load runs 4 fewer days, saving ₱0.17/kg in electricity.",
-    );
+    expect(templateNote(rx)).toBe("4 fewer base-load days, saves ₱0.17/kg.");
   });
 
   it("fills around milling bookings", () => {
@@ -385,9 +380,7 @@ describe("storeMillLater", () => {
       { date: "2026-10-23", kg: 20_400 },
     ]);
     expect(rx.remainderKg).toBe(0);
-    expect(templateNote(rx)).toBe(
-      "Store 60 t of dried palay and mill it on Oct 22–23, when the mill is quiet.",
-    );
+    expect(templateNote(rx)).toBe("Store 60 t dried, mill on Oct 22–23.");
   });
 
   it("stores only what fits every day it waits", () => {

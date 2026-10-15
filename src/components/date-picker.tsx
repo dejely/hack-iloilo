@@ -48,6 +48,8 @@ export type DatePickerProps = {
   id?: string;
   "aria-invalid"?: boolean;
   className?: string;
+  /** Submits the value with a plain form under this name. */
+  name?: string;
 };
 
 export function DatePicker({
@@ -56,32 +58,48 @@ export function DatePicker({
   min,
   max,
   placeholder = "Pick a date",
+  name,
   ...trigger
 }: DatePickerProps) {
   const selected = toPickerDate(value);
   const bounds = usePickerBounds(min, max);
 
   return (
-    <PickerPopover
-      label={value ? formatPickerDate(value) : undefined}
-      placeholder={placeholder}
-      {...trigger}
-    >
-      {(close) => (
-        <Calendar
-          mode="single"
-          selected={selected}
-          defaultMonth={selected}
-          captionLayout="dropdown"
-          disabled={bounds}
-          onSelect={(date) => {
-            onChange?.(fromPickerDate(date));
-            close();
-          }}
-        />
-      )}
-    </PickerPopover>
+    <>
+      {name ? <input type="hidden" name={name} value={value ?? ""} /> : null}
+      <PickerPopover
+        label={value ? formatPickerDate(value) : undefined}
+        placeholder={placeholder}
+        {...trigger}
+      >
+        {(close) => (
+          <Calendar
+            mode="single"
+            selected={selected}
+            defaultMonth={selected}
+            captionLayout="dropdown"
+            disabled={bounds}
+            onSelect={(date) => {
+              onChange?.(fromPickerDate(date));
+              close();
+            }}
+          />
+        )}
+      </PickerPopover>
+    </>
   );
+}
+
+/** An uncontrolled date picker for plain forms: submits its value under `name`. */
+export function DateInput({
+  defaultValue,
+  ...props
+}: Omit<DatePickerProps, "value" | "onChange"> & {
+  defaultValue?: string;
+  name: string;
+}) {
+  const [value, setValue] = React.useState(defaultValue);
+  return <DatePicker {...props} value={value} onChange={setValue} />;
 }
 
 type PickerPopoverProps = {

@@ -75,7 +75,7 @@ export const trackLookupSchema = z.object({
     .string()
     .refine(
       (value) => /^[A-Z0-9]{6}$/.test(cleanRef(value)),
-      "Enter the 6-character ref from your text.",
+      "Enter the 6-character code from your text.",
     ),
   phone: phoneSchema,
 });

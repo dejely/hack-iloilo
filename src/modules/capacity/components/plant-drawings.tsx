@@ -117,40 +117,6 @@ function Ground({ x1, x2 }: { x1: number; x2: number }) {
   );
 }
 
-/** Dot on the part, leader to the label. */
-function Callout(p: {
-  px: number;
-  py: number;
-  tx: number;
-  ty: number;
-  text: string;
-  end?: boolean;
-}) {
-  const lx = p.end ? p.tx + 2 : p.tx - 2;
-  return (
-    <>
-      <circle
-        cx={p.px}
-        cy={p.py}
-        r="1.1"
-        style={fill("var(--muted-foreground)")}
-      />
-      <polyline
-        className="ldr"
-        points={`${p.px},${p.py} ${lx},${p.ty - 2.2}`}
-      />
-      <text
-        className="lbl"
-        x={p.tx}
-        y={p.ty}
-        textAnchor={p.end ? "end" : undefined}
-      >
-        {p.text}
-      </text>
-    </>
-  );
-}
-
 /** Grain inside a cutaway, level `yL`, heaped in the middle. */
 function Grain(p: {
   x1: number;
@@ -207,12 +173,10 @@ const pctOf = (level: number) => Math.round(level * 100);
 export function DryerDrawing({
   level,
   overKg,
-  capacityKg,
 }: {
   /** Expected load over capacity. */
   level: number;
   overKg: number;
-  capacityKg: number;
 }) {
   const top = 59;
   const bot = 114;
@@ -389,28 +353,9 @@ export function DryerDrawing({
       />
       <path className="d" d="M62 172 H76 M62 176 H76 M62 180 H76 M62 184 H76" />
       <path className="o" d="M46 190 V220 M74 190 V220" />
-      <Callout px={110} py={74} tx={20} ty={70} text="TEMPERING BIN" />
-      <Callout px={110} py={130} tx={20} ty={106} text="DRYING SECTION" />
-      <Callout px={56} py={138} tx={20} ty={124} text="BLOWER" />
-      <Callout px={42} py={188} tx={20} ty={206} text="BURNER" />
-      <Callout px={212} py={34} tx={236} ty={22} text="BUCKET ELEV." />
-      <path
-        className="ldr"
-        d="M286 44 H294 M286 170 H294 M290 44 V170 M287 47 L293 41 M287 173 L293 167"
-      />
-      <text
-        className="lbl"
-        transform="translate(299 107) rotate(-90)"
-        textAnchor="middle"
-      >
-        {formatTonnes(capacityKg).toUpperCase()} / DAY
-      </text>
       {overKg > 0 && (
         <Pile x1={234} x2={296} label={`OVERFLOW +${formatTonnes(overKg)}`} />
       )}
-      <text className="ttl" x="20" y="236">
-        DRYERS · RECIRCULATING BATCH · ELEV.
-      </text>
     </svg>
   );
 }
@@ -419,11 +364,9 @@ export function DryerDrawing({
 export function SiloDrawing({
   level,
   overKg,
-  capacityKg,
 }: {
   level: number;
   overKg: number;
-  capacityKg: number;
 }) {
   const top = 78;
   const bot = 206;
@@ -527,9 +470,6 @@ export function SiloDrawing({
         return (
           <g key={t}>
             <path className="d" d={`M181 ${y} H185`} />
-            <text className="lbl" x="188" y={y + 2.3}>
-              {t}
-            </text>
           </g>
         );
       })}
@@ -537,15 +477,7 @@ export function SiloDrawing({
         className="ptr"
         points={`181,${yL} 175,${yL - 3.5} 175,${yL + 3.5}`}
       />
-      <text className="lbl" x="176" y={top - 8}>
-        FILL %
-      </text>
-      <Callout px={78} py={192} tx={20} ty={176} text="AERATION" />
-      <Callout px={150} py={32} tx={196} ty={20} text="CONVEYOR" />
       {overKg > 0 && <Pile x1={8} x2={54} label={`+${formatTonnes(overKg)}`} />}
-      <text className="ttl" x="20" y="236">
-        STORAGE {formatTonnes(capacityKg).toUpperCase()} · ELEV.
-      </text>
     </svg>
   );
 }
@@ -562,20 +494,6 @@ export function MillDrawing({ level }: { level: number }) {
         style={f.metal2}
       />
     </>
-  );
-  const tag = (x: number, y: number, k: number) => (
-    <g key={k}>
-      <circle className="o" cx={x} cy={y} r="5" style={f.card} />
-      <text
-        className="lbl"
-        x={x}
-        y={y + 2.3}
-        textAnchor="middle"
-        style={fill("var(--ink)")}
-      >
-        {k}
-      </text>
-    </g>
   );
   return (
     <svg
@@ -719,14 +637,6 @@ export function MillDrawing({ level }: { level: number }) {
         />
       ))}
       <line className="o" x1="30" y1="212" x2="290" y2="212" />
-      {tag(64, 142, 1)}
-      {tag(150, 130, 2)}
-      {tag(169, 156, 3)}
-      {tag(242, 144, 4)}
-      {tag(272, 130, 5)}
-      <text className="lbl" x="20" y="236">
-        1 CLEANER 2 HUSKER 3 SEPARATOR 4 WHITENER 5 BAGGING
-      </text>
     </svg>
   );
 }

@@ -1,21 +1,16 @@
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Fragment } from "react";
+import { ServiceIcon, isServiceIconKind } from "@/components/service-icon";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "cn";
 import { todayManila } from "@/lib/dates";
-import { formatKg } from "@/lib/format";
 import { requireRole } from "@/modules/accounts/auth";
 import { buyerTypeLabels, buyerTypes } from "@/modules/accounts/logic";
-import { dispatchPeriod, serviceLabels, stageLabels } from "../logic";
+import { dispatchPeriod, stageLabels } from "../logic";
 import { listBatches } from "../queries";
-import type { Batch, BatchListRow } from "../types";
+import type { Batch } from "../types";
+import { BatchesDataTable } from "./batches-data-table";
 import { DispatchSummary } from "./dispatch-summary";
 
 const stages: Batch["stage"][] = [
@@ -27,11 +22,6 @@ const stages: Batch["stage"][] = [
   "dispatched",
 ];
 
-const day = new Intl.DateTimeFormat("en-PH", {
-  dateStyle: "medium",
-  timeZone: "Asia/Manila",
-});
-
 /** `/batches` with the given filters, leaving out empty ones. */
 function batchesHref(params: Record<string, string | undefined>): string {
   const query = new URLSearchParams(
@@ -40,12 +30,6 @@ function batchesHref(params: Record<string, string | undefined>): string {
     ),
   ).toString();
   return query ? `/batches?${query}` : "/batches";
-}
-
-/** The weight to show for a batch: the latest one it has recorded. */
-function weight(batch: BatchListRow): string {
-  const kg = batch.rice_kg ?? batch.dried_kg ?? batch.net_kg;
-  return kg ? formatKg(kg) : "—";
 }
 
 export async function BatchesList({
@@ -83,19 +67,36 @@ export async function BatchesList({
         keep={{ stage, buyer_type: buyerType }}
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label="Filter by stage">
+      {/* Stages in process order, arrows showing the flow. */}
+      <nav
+        className="flex flex-wrap items-center gap-2"
+        aria-label="Filter by stage"
+      >
         <FilterLink
           label="All"
           active={!stage}
           href={batchesHref({ ...filters, stage: undefined })}
         />
-        {stages.map((s) => (
-          <FilterLink
-            key={s}
-            label={stageLabels[s]}
-            active={stage === s}
-            href={batchesHref({ ...filters, stage: s })}
-          />
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        {stages.map((s, i) => (
+          <Fragment key={s}>
+            {i > 0 ? (
+              <ArrowRight
+                aria-hidden
+                className="size-4 text-muted-foreground"
+              />
+            ) : null}
+            <FilterLink
+              label={stageLabels[s]}
+              icon={
+                isServiceIconKind(s) ? (
+                  <ServiceIcon kind={s} className="size-4" />
+                ) : null
+              }
+              active={stage === s}
+              href={batchesHref({ ...filters, stage: s })}
+            />
+          </Fragment>
         ))}
       </nav>
 
@@ -120,56 +121,7 @@ export async function BatchesList({
           {stage || buyerType ? "No batches match." : "No batches yet."}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Batch</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Line</TableHead>
-                <TableHead>Ownership</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
-                <TableHead>Opened</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {batches.map((batch) => (
-                <TableRow key={batch.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/batches/${batch.id}`}
-                      className="underline-offset-4 hover:underline"
-                    >
-                      {batch.batch_no}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{batch.client.name}</TableCell>
-                  <TableCell>
-                    {batch.entry ? serviceLabels[batch.entry.service] : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {batch.ownership === "irpc" ? "IRPC" : "Custom"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {stageLabels[batch.stage]}
-                    </Badge>
-                    {batch.confirmations.some(
-                      (c) => c.status === "disputed",
-                    ) ? (
-                      <Badge variant="destructive">Weight disputed</Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right">{weight(batch)}</TableCell>
-                  <TableCell>
-                    {day.format(new Date(batch.created_at))}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <BatchesDataTable batches={batches} />
       )}
     </section>
   );
@@ -177,10 +129,12 @@ export async function BatchesList({
 
 function FilterLink({
   label,
+  icon,
   href,
   active,
 }: {
   label: string;
+  icon?: React.ReactNode;
   href: string;
   active: boolean;
 }) {
@@ -188,12 +142,13 @@ function FilterLink({
     <Link
       href={href}
       className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
         active
           ? "border-transparent bg-primary text-primary-foreground"
           : "border-input hover:bg-accent hover:text-accent-foreground",
       )}
     >
+      {icon}
       {label}
     </Link>
   );

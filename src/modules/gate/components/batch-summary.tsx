@@ -1,5 +1,12 @@
+import {
+  ServiceIcon,
+  ServiceLabel,
+  isServiceIconKind,
+} from "@/components/service-icon";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { StatusBadge } from "@/components/status-badge";
+import { InfoIcon } from "@/components/hint-icons";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -16,9 +23,11 @@ import {
   recoveryPct,
   serviceLabels,
   stageLabels,
+  stageTones,
 } from "../logic";
 import { WeightConfirmations } from "./weight-confirmations";
 import { batchWeightConfirmations, batchSummary } from "../queries";
+import { batchChip } from "./batch-link";
 import { BatchStages } from "./batch-stages";
 
 const started = new Intl.DateTimeFormat("en-PH", {
@@ -31,7 +40,7 @@ function when(iso: string | null): string {
   return iso ? started.format(new Date(iso)) : "—";
 }
 
-function FieldList({ rows }: { rows: [string, string][] }) {
+function FieldList({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
       {rows.map(([label, value]) => (
@@ -58,9 +67,18 @@ export async function BatchSummaryCard({ id }: { id: string }) {
   ]);
   const recovery = recoveryPct(batch.rice_kg, batch.mill_in_kg);
   const skippedDrying = !batch.dry_start && batch.stage !== "received";
-  const rows: [string, string][] = [
+  const rows: [string, React.ReactNode][] = [
     ["Client", `${batch.client.name} · ${batch.client.phone}`],
-    ["Line", batch.entry ? serviceLabels[batch.entry.service] : "—"],
+    [
+      "Line",
+      batch.entry ? (
+        <ServiceLabel kind={batch.entry.service}>
+          {serviceLabels[batch.entry.service]}
+        </ServiceLabel>
+      ) : (
+        "—"
+      ),
+    ],
     ["Ownership", ownershipLabels[batch.ownership]],
     ["Est. weight", batch.entry?.est_kg ? formatKg(batch.entry.est_kg) : "—"],
     ["Started", when(batch.entry?.started_at ?? null)],
@@ -75,8 +93,8 @@ export async function BatchSummaryCard({ id }: { id: string }) {
   return (
     <section className="flex min-w-0 flex-col gap-6 font-sans [--font-sans:var(--font-geist-sans)]">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Batch {batch.batch_no}
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          Batch <span className={batchChip}>{batch.batch_no}</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           Recorded in stages, from the gate through drying and milling.
@@ -86,7 +104,17 @@ export async function BatchSummaryCard({ id }: { id: string }) {
         <CardHeader>
           <CardTitle>Batch record</CardTitle>
           <CardDescription>
-            Stage <Badge variant="secondary">{stageLabels[batch.stage]}</Badge>
+            Stage{" "}
+            <StatusBadge
+              tone={stageTones[batch.stage]}
+              icon={
+                isServiceIconKind(batch.stage) ? (
+                  <ServiceIcon kind={batch.stage} />
+                ) : undefined
+              }
+            >
+              {stageLabels[batch.stage]}
+            </StatusBadge>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,7 +162,9 @@ export async function BatchSummaryCard({ id }: { id: string }) {
       {showDrying ? (
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Drying</CardTitle>
+            <CardTitle>
+              <ServiceLabel kind="drying">Drying</ServiceLabel>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {skippedDrying ? (
@@ -164,10 +194,13 @@ export async function BatchSummaryCard({ id }: { id: string }) {
       {showMilling ? (
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Milling</CardTitle>
+            <CardTitle>
+              <ServiceLabel kind="milling">Milling</ServiceLabel>
+            </CardTitle>
             {recovery != null ? (
               <CardDescription>
                 Recovery <Badge variant="secondary">{recovery}%</Badge>
+                <InfoIcon text="Milled rice out of the palay that went into the mill, by weight." />
               </CardDescription>
             ) : null}
           </CardHeader>

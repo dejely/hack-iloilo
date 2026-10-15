@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { toast } from "sonner";
+import { DatePicker } from "@/components/date-picker";
+import { OptionSelect } from "@/components/option-select";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -10,23 +13,33 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
+import { SheetFooter } from "@/components/ui/sheet";
 import { submitOffer, type OfferFormState } from "../actions";
 
 type ClientOption = { id: string; name: string; phone: string };
 type VarietyOption = { id: string; code: string; name: string };
 
+/** Staff record of a client's offer to sell palay, laid out for a sheet. */
 export function OfferForm({
   clients,
   varieties,
+  onSaved,
 }: {
   clients: ClientOption[];
   varieties: VarietyOption[];
+  onSaved?: () => void;
 }) {
-  const [state, action, pending] = useActionState(submitOffer, undefined);
+  const [state, action, pending] = useActionState(
+    async (previous: OfferFormState, formData: FormData) => {
+      const result = await submitOffer(previous, formData);
+      if (result?.ok) {
+        toast.success(`Offer ${result.ref} recorded.`);
+        onSaved?.();
+      }
+      return result;
+    },
+    undefined,
+  );
   // A new ref means a successful submit: remount the fields to clear them
   // (DOM and phone state both reset), without a setState-in-effect.
   const resetKey = state?.ok ? state.ref : "new";
@@ -57,49 +70,42 @@ function OfferFields({
   state: OfferFormState;
 }) {
   const [phone, setPhone] = useState("");
+  const [harvestDate, setHarvestDate] = useState("");
 
   return (
-    <form action={action}>
-      <FieldGroup>
+    <form
+      action={action}
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+    >
+      <FieldGroup className="p-4">
         <Field>
           <FieldLabel htmlFor="clientId">Client</FieldLabel>
-          <NativeSelect
+          <OptionSelect
             id="clientId"
             name="clientId"
-            className="w-full"
             required
             defaultValue=""
-            onChange={(e) => {
-              const client = clients.find((c) => c.id === e.target.value);
+            placeholder="Select a client"
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            onChange={(id) => {
+              const client = clients.find((c) => c.id === id);
               setPhone(client?.phone ?? "");
             }}
-          >
-            <NativeSelectOption value="" disabled>
-              Select a client
-            </NativeSelectOption>
-            {clients.map((c) => (
-              <NativeSelectOption key={c.id} value={c.id}>
-                {c.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          />
         </Field>
 
         <Field>
           <FieldLabel htmlFor="varietyId">Variety</FieldLabel>
-          <NativeSelect
+          <OptionSelect
             id="varietyId"
             name="varietyId"
-            className="w-full"
             defaultValue=""
-          >
-            <NativeSelectOption value="">Unknown</NativeSelectOption>
-            {varieties.map((v) => (
-              <NativeSelectOption key={v.id} value={v.id}>
-                {v.code} — {v.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+            none="Unknown"
+            options={varieties.map((v) => ({
+              value: v.id,
+              label: `${v.code} — ${v.name}`,
+            }))}
+          />
           <FieldDescription>Optional.</FieldDescription>
         </Field>
 
@@ -118,7 +124,12 @@ function OfferFields({
 
         <Field>
           <FieldLabel htmlFor="harvestDate">Harvest date</FieldLabel>
-          <Input id="harvestDate" name="harvestDate" type="date" required />
+          <DatePicker
+            id="harvestDate"
+            name="harvestDate"
+            value={harvestDate}
+            onChange={(value) => setHarvestDate(value ?? "")}
+          />
         </Field>
 
         <Field>
@@ -136,14 +147,12 @@ function OfferFields({
         </Field>
 
         {state && !state.ok && <FieldError>{state.error}</FieldError>}
-        {state?.ok && (
-          <FieldDescription>Offer {state.ref} recorded.</FieldDescription>
-        )}
-
+      </FieldGroup>
+      <SheetFooter>
         <Button type="submit" disabled={pending}>
           {pending ? "Recording…" : "Record offer"}
         </Button>
-      </FieldGroup>
+      </SheetFooter>
     </form>
   );
 }

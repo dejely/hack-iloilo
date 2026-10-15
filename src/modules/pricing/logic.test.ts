@@ -6,6 +6,7 @@ import {
   parsePriceForm,
   type PriceRule,
   priceReceiving,
+  priceTrend,
   quote,
 } from "./logic";
 
@@ -296,5 +297,39 @@ describe("parsePriceForm", () => {
     const result = parsePriceForm({ ...validPriceForm, drying: "-1" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("drying fee");
+  });
+});
+
+describe("priceTrend", () => {
+  const row = (effective_date: string, created_at: string, base: number) => ({
+    effective_date,
+    created_at,
+    buy_base_minor_per_kg: base,
+    drying_fee_minor_per_kg: 160,
+    milling_fee_minor_per_kg: 330,
+    rice_minor_per_kg: 4700,
+  });
+
+  it("keeps the newest save per date, oldest date first, in pesos", () => {
+    const trend = priceTrend([
+      row("2026-10-10", "2026-10-09T01:00:00Z", 2100),
+      row("2026-10-01", "2026-09-30T01:00:00Z", 2000),
+      row("2026-10-10", "2026-10-09T05:00:00Z", 2150),
+    ]);
+    expect(trend.map((p) => [p.date, p.buyBase])).toEqual([
+      ["2026-10-01", 20],
+      ["2026-10-10", 21.5],
+    ]);
+    expect(trend[0]).toMatchObject({ drying: 1.6, milling: 3.3, rice: 47 });
+  });
+
+  it("keeps only the most recent dates", () => {
+    const rows = ["01", "02", "03"].map((d) =>
+      row(`2026-10-${d}`, `2026-10-${d}T00:00:00Z`, 2100),
+    );
+    expect(priceTrend(rows, 2).map((p) => p.date)).toEqual([
+      "2026-10-02",
+      "2026-10-03",
+    ]);
   });
 });

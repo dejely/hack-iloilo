@@ -64,3 +64,11 @@ export type BatchTrail = Batch & {
   entry: Pick<QueueEntry, "service" | "started_at"> | null;
   dispatches: DispatchRow[];
 };
+/** What a public batch lookup shows: no names, phones or buyers. */
+export type PublicTrail = {
+  batchNo: string;
+  /** The co-op, or "<municipality> farmers"; never a person's name. */
+  origin: string | null;
+  variety: string | null;
+  steps: { label: string; date: string }[];
+};

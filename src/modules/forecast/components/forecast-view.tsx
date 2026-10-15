@@ -1,3 +1,4 @@
+import { InfoIcon } from "@/components/hint-icons";
 import { connection } from "next/server";
 import { TrendingUp } from "lucide-react";
 import {
@@ -78,17 +79,22 @@ function bar(
 
 function Stat({
   label,
+  info,
   value,
   detail,
 }: {
   label: string;
+  info?: string;
   value: string;
   detail: string;
 }) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardDescription>{label}</CardDescription>
+        <CardDescription className="flex items-center gap-1">
+          {label}
+          {info ? <InfoIcon text={info} /> : null}
+        </CardDescription>
         <div className="text-3xl font-semibold tracking-tight tabular-nums">
           {value}
         </div>
@@ -146,6 +152,7 @@ export async function ForecastView() {
       <div className="grid gap-4 md:grid-cols-3">
         <Stat
           label={`Expected palay, next ${CHART_WEEKS} weeks`}
+          info="Expected is the middle estimate. Likely is the range it should fall in about 8 times out of 10."
           value={formatTonnes(all.kgMid)}
           detail={`Likely ${rangeT(all)}`}
         />

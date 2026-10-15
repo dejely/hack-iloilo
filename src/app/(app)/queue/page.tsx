@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueueLoader } from "@/modules/gate/components/queue-loader";
 
-export const metadata: Metadata = { title: "Gate queue" };
+export const metadata: Metadata = { title: "Queue" };
 
 export default function QueuePage() {
   return (

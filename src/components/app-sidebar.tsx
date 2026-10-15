@@ -3,7 +3,8 @@
 import { ChevronsUpDown, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Logo } from "@/components/brand";
+import { Logo, Wordmark } from "@/components/brand";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,16 +45,16 @@ export function AppSidebar({ staff }: { staff: Staff }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/capacity" />}>
-              <div className="flex size-8 items-center justify-center text-primary">
-                <Logo className="size-8" />
-              </div>
-              <div className="grid text-left leading-tight">
-                <span className="font-medium">SACKTO</span>
-                <span className="text-xs text-muted-foreground">
-                  IRPC Capacity Planning
-                </span>
-              </div>
+            {/* The wordmark, or just the mark when the sidebar collapses to icons. */}
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/capacity" aria-label="SACKTO" />}
+            >
+              <Wordmark
+                aria-hidden
+                className="h-6! w-auto! text-primary group-data-[collapsible=icon]:hidden"
+              />
+              <Logo className="hidden size-8! text-primary group-data-[collapsible=icon]:block" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -61,7 +62,9 @@ export function AppSidebar({ staff }: { staff: Staff }) {
       <SidebarContent>
         {groups.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-sm">
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
@@ -70,6 +73,7 @@ export function AppSidebar({ staff }: { staff: Staff }) {
                       tooltip={item.title}
                       isActive={pathname.startsWith(item.href)}
                       render={<Link href={item.href} />}
+                      className="h-9 text-[0.9375rem] [&_svg]:size-[1.125rem]"
                     >
                       <item.icon />
                       <span>{item.title}</span>
@@ -86,13 +90,18 @@ export function AppSidebar({ staff }: { staff: Staff }) {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
-                <div className="grid flex-1 text-left leading-tight">
+                <Avatar className="size-8 shrink-0 rounded-full">
+                  <AvatarFallback className="rounded-full bg-primary/10 font-semibold text-primary">
+                    {initials(staff.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-medium">{staff.name}</span>
                   <span className="truncate text-xs text-muted-foreground capitalize">
                     {staff.role}
                   </span>
                 </div>
-                <ChevronsUpDown className="ml-auto size-4" />
+                <ChevronsUpDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start">
                 <DropdownMenuItem onClick={() => signOut()}>
@@ -107,4 +116,12 @@ export function AppSidebar({ staff }: { staff: Staff }) {
       <SidebarRail />
     </Sidebar>
   );
+}
+
+/** `MM` from "Maria Manager": the first letters of the first and last names. */
+function initials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return [words[0], words.length > 1 ? words.at(-1) : undefined]
+    .map((word) => word?.[0]?.toUpperCase() ?? "")
+    .join("");
 }

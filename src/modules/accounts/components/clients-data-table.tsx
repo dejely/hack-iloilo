@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo } from "react";
 import { createColumnHelper, useTable } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -140,13 +141,16 @@ export function ClientsDataTable({
                         aria-label={`Sort by ${header.column.columnDef.header}`}
                       >
                         <table.FlexRender header={header} />
-                        <span aria-hidden="true">
-                          {header.column.getIsSorted() === "asc"
-                            ? "↑"
-                            : header.column.getIsSorted() === "desc"
-                              ? "↓"
-                              : "↕"}
-                        </span>
+                        {header.column.getIsSorted() === "asc" ? (
+                          <ArrowUp data-icon="inline-end" />
+                        ) : header.column.getIsSorted() === "desc" ? (
+                          <ArrowDown data-icon="inline-end" />
+                        ) : (
+                          <ArrowUpDown
+                            data-icon="inline-end"
+                            className="text-muted-foreground"
+                          />
+                        )}
                       </Button>
                     ) : (
                       <table.FlexRender header={header} />

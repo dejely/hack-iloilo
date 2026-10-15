@@ -242,7 +242,7 @@ describe("public /track actions", () => {
   };
   const notFound = {
     status: "error",
-    message: "No booking matches that ref and phone.",
+    message: "No booking matches that code and phone.",
   };
 
   beforeEach(() => vi.mocked(trackLocked).mockResolvedValue(false));
@@ -311,7 +311,7 @@ describe("public /track actions", () => {
     expect(await trackBooking({ ref: "ABC", phone: "12345" })).toMatchObject({
       status: "error",
       fieldErrors: {
-        ref: "Enter the 6-character ref from your text.",
+        ref: "Enter the 6-character code from your text.",
         phone: "Enter a valid Philippine mobile number.",
       },
     });

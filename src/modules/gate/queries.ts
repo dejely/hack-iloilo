@@ -49,6 +49,12 @@ import {
   refCheckInError,
   refKindLabels,
   refLine,
+  dispatchableKg,
+  dispatchedKg,
+  remainingKg,
+  riceStockKg,
+  traceOrigin,
+  traceSteps,
 } from "./logic";
 import type {
   Batch,
@@ -58,6 +64,7 @@ import type {
   BatchTrail,
   BuyerType,
   Dispatch,
+  PublicTrail,
   QueueEntry,
   QueueRow,
   RefKind,
@@ -162,7 +169,7 @@ function notFound(kind: RefKind | null, ref: string): GateError {
   const what = kind
     ? `${refKindLabels[kind].toLowerCase()}`
     : "booking or offer";
-  return new GateError("ref_not_found", `No ${what} has ref ${ref}.`);
+  return new GateError("ref_not_found", `No ${what} has code ${ref}.`);
 }
 
 async function checkInBooking(input: string): Promise<QueueEntry> {
@@ -676,6 +683,76 @@ export async function batchTrail(id: string): Promise<BatchTrail | null> {
     a.dispatched_at.localeCompare(b.dispatched_at),
   );
   return data as BatchTrail;
+}
+
+/** Kg of IRPC-owned rice not yet dispatched, for the public /buy page. */
+export async function riceStock(): Promise<number> {
+  const facility = await currentFacility();
+  const { data, error } = await db()
+    .from("batches")
+    .select("ownership, stage, rice_kg, dried_kg, dispatches(kg)")
+    .eq("facility_id", facility.id)
+    .eq("ownership", "irpc")
+    .not("rice_kg", "is", null);
+  if (error) throw error;
+  return riceStockKg(data);
+}
+
+/** IRPC batches with rice left to sell, oldest first, for recording a rice pickup. */
+export async function riceBatchesForSale(): Promise<
+  { id: string; batchNo: string; remainingKg: number }[]
+> {
+  const facility = await currentFacility();
+  const { data, error } = await db()
+    .from("batches")
+    .select("id, batch_no, ownership, stage, rice_kg, dried_kg, dispatches(kg)")
+    .eq("facility_id", facility.id)
+    .eq("ownership", "irpc")
+    .not("rice_kg", "is", null)
+    .order("batch_no");
+  if (error) throw error;
+  return data
+    .map((b) => ({
+      id: b.id,
+      batchNo: b.batch_no,
+      remainingKg: remainingKg(dispatchableKg(b), dispatchedKg(b.dispatches)),
+    }))
+    .filter((b) => b.remainingKg > 0);
+}
+
+/**
+ * A sold batch's origin and dates by batch no., for buyers. Only IRPC-owned
+ * batches with a dispatch: a farmer's custom-milled rice stays private. Never
+ * reads names or phones.
+ */
+export async function publicBatchTrail(
+  batchNo: string,
+): Promise<PublicTrail | null> {
+  const { data, error } = await db()
+    .from("batches")
+    .select(
+      "batch_no, dry_end, mill_end, variety:varieties(name), client:clients(kind, name, coop:coop_id(name), municipality:municipalities(name)), dispatches!inner(id)",
+    )
+    .eq("batch_no", batchNo)
+    .eq("ownership", "irpc")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    batchNo: data.batch_no,
+    origin: traceOrigin({
+      kind: data.client.kind,
+      name: data.client.name,
+      coopName: data.client.coop?.name ?? null,
+      municipality: data.client.municipality?.name ?? null,
+    }),
+    variety: data.variety?.name ?? null,
+    steps: traceSteps({
+      batchNo: data.batch_no,
+      dryEnd: data.dry_end,
+      millEnd: data.mill_end,
+    }),
+  };
 }
 
 /**

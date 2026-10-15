@@ -1,9 +1,20 @@
 "use client";
 
+import {
+  ArrowLeft,
+  CalendarCheck,
+  CalendarClock,
+  CalendarX,
+  Check,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+import { ServiceLabel } from "@/components/service-icon";
 import { useId, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@/components/date-picker";
+import { InfoIcon } from "@/components/hint-icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -15,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -37,19 +48,12 @@ import {
   type TrackResult,
 } from "../actions";
 import { trackLookupSchema, type TrackLookupInput } from "../booking-schema";
-import { MAX_FLEX_DAYS, serviceLabels, statusLabels } from "../logic";
-import type { BookingStatus } from "../types";
-
-const statusVariants: Record<
-  BookingStatus,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  confirmed: "secondary",
-  reschedule_proposed: "outline",
-  arrived: "default",
-  cancelled: "destructive",
-  no_show: "destructive",
-};
+import {
+  MAX_FLEX_DAYS,
+  serviceLabels,
+  statusLabels,
+  statusTones,
+} from "../logic";
 
 /** Public /track: look up a booking by ref and phone, then check, move, cancel or answer a proposal. */
 export function TrackBooking({
@@ -78,7 +82,7 @@ export function TrackBooking({
       try {
         const result = await action();
         if (result.status === "error") {
-          setMessage(result.message ?? "Check the ref and mobile number.");
+          setMessage(result.message ?? "Check the code and mobile number.");
           return;
         }
         setBooking(result.booking);
@@ -136,7 +140,7 @@ export function TrackBooking({
     <form onSubmit={submit}>
       <FieldGroup>
         <Field data-invalid={!!errors.ref}>
-          <FieldLabel htmlFor={`${formId}-ref`}>Booking ref</FieldLabel>
+          <FieldLabel htmlFor={`${formId}-ref`}>Booking code</FieldLabel>
           <Input
             id={`${formId}-ref`}
             autoComplete="off"
@@ -149,7 +153,7 @@ export function TrackBooking({
             disabled={pending}
           />
           <FieldDescription>
-            The 6-character ref we texted you.
+            The 6-character code we texted you.
           </FieldDescription>
           <FieldError errors={[errors.ref]} />
         </Field>
@@ -177,7 +181,11 @@ export function TrackBooking({
           </Alert>
         ) : null}
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? <Spinner data-icon="inline-start" /> : null}
+          {pending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <Search data-icon="inline-start" />
+          )}
           {pending ? "Looking up…" : "Find my booking"}
         </Button>
       </FieldGroup>
@@ -219,12 +227,14 @@ function BookingDetails({
         <p className="font-mono text-4xl font-bold tracking-widest">
           {booking.ref}
         </p>
-        <Badge variant={statusVariants[booking.status]}>
+        <StatusBadge tone={statusTones[booking.status]}>
           {statusLabels[booking.status]}
-        </Badge>
+        </StatusBadge>
         <p>
-          {serviceLabels[booking.service]} · {formatKg(booking.est_kg)} ·{" "}
-          {formatDate(booking.scheduled_date)}
+          <ServiceLabel kind={booking.service} className="align-bottom">
+            {serviceLabels[booking.service]}
+          </ServiceLabel>{" "}
+          · {formatKg(booking.est_kg)} · {formatDate(booking.scheduled_date)}
         </p>
         {open ? (
           <p className="text-sm text-muted-foreground">
@@ -259,6 +269,7 @@ function BookingDetails({
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button disabled={pending} onClick={() => onAnswer(true)}>
+              <Check data-icon="inline-start" />
               Accept
             </Button>
             <Button
@@ -292,6 +303,7 @@ function BookingDetails({
             disabled={pending}
             onClick={() => setMoving(true)}
           >
+            <CalendarClock data-icon="inline-start" />
             Change date
           </Button>
           {booking.status === "confirmed" ? (
@@ -301,6 +313,7 @@ function BookingDetails({
               disabled={pending}
               onClick={() => setCancelling(true)}
             >
+              <CalendarX data-icon="inline-start" />
               Cancel booking
             </Button>
           ) : null}
@@ -309,11 +322,16 @@ function BookingDetails({
 
       <Separator />
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="ghost" disabled={pending} onClick={onRefresh}>
-          {pending ? <Spinner data-icon="inline-start" /> : null}
+        <Button variant="outline" disabled={pending} onClick={onRefresh}>
+          {pending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <RefreshCw data-icon="inline-start" />
+          )}
           Refresh
         </Button>
-        <Button variant="ghost" disabled={pending} onClick={onReset}>
+        <Button variant="outline" disabled={pending} onClick={onReset}>
+          <Search data-icon="inline-start" />
           Look up another
         </Button>
       </div>
@@ -360,7 +378,7 @@ function StatusNote({ booking }: { booking: TrackedBooking }) {
     case "confirmed":
       return (
         <p className="text-sm text-muted-foreground">
-          Come on {formatDate(booking.scheduled_date)} and show this ref at the
+          Come on {formatDate(booking.scheduled_date)} and show this code at the
           gate.
         </p>
       );
@@ -371,9 +389,12 @@ function StatusNote({ booking }: { booking: TrackedBooking }) {
         <ul className="flex flex-col gap-1 rounded-lg border p-3 text-sm">
           {booking.queue.map((place) => (
             <li key={place.service}>
-              <span className="font-semibold">
+              <ServiceLabel
+                kind={place.service}
+                className="align-bottom font-semibold"
+              >
                 {serviceLabels[place.service]}:
-              </span>{" "}
+              </ServiceLabel>{" "}
               {place.serving
                 ? "you're being served now."
                 : `#${place.position} in line.`}
@@ -439,7 +460,10 @@ function MoveForm({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-flex`}>Flex days</FieldLabel>
+          <FieldLabel htmlFor={`${id}-flex`}>
+            Flex days
+            <InfoIcon text="If your day fills up, we may move you within these days instead of turning you away." />
+          </FieldLabel>
           <Input
             id={`${id}-flex`}
             type="number"
@@ -459,6 +483,7 @@ function MoveForm({
       </FieldGroup>
       <div className="grid grid-cols-2 gap-2">
         <Button type="submit" disabled={pending || !date}>
+          <CalendarCheck data-icon="inline-start" />
           Move booking
         </Button>
         <Button
@@ -467,6 +492,7 @@ function MoveForm({
           disabled={pending}
           onClick={onClose}
         >
+          <ArrowLeft data-icon="inline-start" />
           Back
         </Button>
       </div>

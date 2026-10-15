@@ -1,11 +1,15 @@
 import { Info, type LucideIcon, TriangleAlert } from "lucide-react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "cn";
 
+/**
+ * An icon that explains something. A popover rather than a tooltip, so it
+ * opens on hover and focus on desktop and on tap on phones.
+ */
 function HintIcon({
   icon: Icon,
   text,
@@ -16,16 +20,26 @@ function HintIcon({
   className?: string;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={<span tabIndex={0} />}
+    <Popover>
+      <PopoverTrigger
+        type="button"
+        openOnHover
+        delay={100}
         aria-label={text}
-        className={cn("inline-flex", className)}
+        className={cn(
+          "inline-flex cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          className,
+        )}
       >
         <Icon className="size-3.5" />
-      </TooltipTrigger>
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        className="w-auto max-w-64 p-2 text-xs leading-snug font-normal"
+      >
+        {text}
+      </PopoverContent>
+    </Popover>
   );
 }
 

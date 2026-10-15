@@ -3,6 +3,7 @@ import { checkInSchema } from "./checkin-schema";
 import {
   arrivalLabel,
   batchNo,
+  batchNoDate,
   batchOwnership,
   dispatchableKg,
   dispatchedKg,
@@ -15,6 +16,7 @@ import {
   maskPhone,
   nextBatchNo,
   nextStage,
+  normalizeBatchNo,
   normalizeRef,
   NOT_IN_LINE_REPLY,
   queueLines,
@@ -25,6 +27,9 @@ import {
   refCheckInError,
   refLine,
   remainingKg,
+  riceStockKg,
+  traceOrigin,
+  traceSteps,
   waitMinutes,
 } from "./logic";
 import type { QueueRow } from "./types";
@@ -489,5 +494,105 @@ describe("checkInSchema", () => {
       checkInSchema.safeParse({ ...input, mode: "walkIn", name: "Ana" })
         .success,
     ).toBe(true);
+  });
+});
+
+describe("riceStockKg", () => {
+  const milled = {
+    ownership: "irpc" as const,
+    stage: "milled" as const,
+    rice_kg: 1000,
+    dried_kg: 1500,
+    dispatches: [{ kg: 300 }],
+  };
+
+  it("sums what's left of IRPC rice", () => {
+    expect(riceStockKg([milled, { ...milled, dispatches: [] }])).toBe(1700);
+  });
+
+  it("ignores custom batches", () => {
+    expect(riceStockKg([{ ...milled, ownership: "custom" }])).toBe(0);
+  });
+
+  it("never goes below zero", () => {
+    expect(riceStockKg([{ ...milled, dispatches: [{ kg: 1200 }] }])).toBe(0);
+  });
+});
+
+describe("normalizeBatchNo", () => {
+  it("adds the dash to digits typed on a keypad", () => {
+    expect(normalizeBatchNo("261015007")).toBe("261015-007");
+  });
+
+  it("drops spaces and keeps a typed dash", () => {
+    expect(normalizeBatchNo(" 261015-007 ")).toBe("261015-007");
+  });
+
+  it("is empty for no digits", () => {
+    expect(normalizeBatchNo("abc")).toBe("");
+  });
+});
+
+describe("batchNoDate", () => {
+  it("reads the receiving day from the batch no.", () => {
+    expect(batchNoDate(batchNo("2026-10-15", 7))).toBe("2026-10-15");
+  });
+});
+
+describe("traceSteps", () => {
+  it("lists each stage with its Manila date", () => {
+    expect(
+      traceSteps({
+        batchNo: "261020-001",
+        dryEnd: "2026-10-22T17:00:00Z",
+        millEnd: "2026-10-25T03:00:00Z",
+      }),
+    ).toEqual([
+      { label: "Received", date: "2026-10-20" },
+      { label: "Dried", date: "2026-10-23" },
+      { label: "Milled", date: "2026-10-25" },
+    ]);
+  });
+
+  it("leaves out drying for dry palay", () => {
+    expect(
+      traceSteps({
+        batchNo: "261020-001",
+        dryEnd: null,
+        millEnd: "2026-10-21T03:00:00Z",
+      }).map((s) => s.label),
+    ).toEqual(["Received", "Milled"]);
+  });
+});
+
+describe("traceOrigin", () => {
+  const farmer = {
+    kind: "farmer",
+    name: "Merlinda Tayco",
+    coopName: null,
+    municipality: "Pototan",
+  };
+
+  it("names a co-op client", () => {
+    expect(
+      traceOrigin({ ...farmer, kind: "coop", name: "Lumbo Rice Growers" }),
+    ).toBe("Lumbo Rice Growers");
+  });
+
+  it("shows a member's co-op, not their name", () => {
+    expect(traceOrigin({ ...farmer, coopName: "Amamaros Farmers MPC" })).toBe(
+      "Amamaros Farmers MPC",
+    );
+  });
+
+  it("falls back to the municipality, never a person or trader's name", () => {
+    expect(traceOrigin(farmer)).toBe("Pototan farmers");
+    expect(
+      traceOrigin({ ...farmer, kind: "trader", name: "Nonoy Palay Trading" }),
+    ).toBe("Pototan farmers");
+  });
+
+  it("is null with nothing safe to show", () => {
+    expect(traceOrigin({ ...farmer, municipality: null })).toBeNull();
   });
 });

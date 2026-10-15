@@ -1,39 +1,44 @@
-import { cn } from "cn";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Wallet } from "lucide-react";
+import { ToolDialog } from "@/components/tool-dialog";
 import { formatDate, formatMoney } from "@/lib/format";
 import { getStaff } from "@/modules/accounts/auth";
+import { cn } from "cn";
 import { buyingBudget } from "../queries";
 import { BudgetForm } from "./budget-form";
 
 /**
- * Working capital used and remaining against the manager's buying budget.
- * Renders nothing for encoders (costs are manager-only) without redirecting
- * them off the shared buying page, as `RoleGate` would.
+ * Working capital used and remaining against the manager's buying budget,
+ * behind a button that shows what is left. Renders nothing for encoders
+ * (costs are manager-only) without redirecting them off the shared buying
+ * page, as `RoleGate` would.
  */
-export async function BudgetCard() {
+export async function BudgetButton() {
   const staff = await getStaff();
   if (staff?.role !== "manager") return null;
 
   const budget = await buyingBudget();
   const over = budget.remainingMinor < 0;
+  const left = formatMoney(Math.abs(budget.remainingMinor));
 
   return (
-    <Card className="h-fit">
-      <CardHeader>
-        <CardTitle>Buying budget</CardTitle>
-        <CardDescription>
-          {budget.start
-            ? `Purchases since ${formatDate(budget.start)}.`
-            : "All purchases. Set a start date to begin a period."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <ToolDialog
+      trigger={
+        <>
+          <Wallet data-icon="inline-start" />
+          Budget ·{" "}
+          <span className={cn("tabular-nums", over && "text-destructive")}>
+            {over ? `${left} over` : `${left} left`}
+          </span>
+        </>
+      }
+      title="Buying budget"
+      description={
+        budget.start
+          ? `Purchases since ${formatDate(budget.start)}.`
+          : "All purchases. Set a start date to begin a period."
+      }
+    >
+      <div className="flex flex-col gap-4">
         <dl className="grid grid-cols-3 gap-2 text-sm">
           <div>
             <dt className="text-muted-foreground">Budget</dt>
@@ -57,7 +62,7 @@ export async function BudgetCard() {
                 over && "text-destructive",
               )}
             >
-              {formatMoney(Math.abs(budget.remainingMinor))}
+              {left}
             </dd>
           </div>
         </dl>
@@ -67,7 +72,7 @@ export async function BudgetCard() {
           budget={(budget.budgetMinor / 100).toFixed(2)}
           start={budget.start ?? ""}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </ToolDialog>
   );
 }

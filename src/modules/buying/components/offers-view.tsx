@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "cn";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
+import { badgeVariants } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -9,10 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatKg } from "@/lib/format";
+import { formatDate, formatKg } from "@/lib/format";
 import { getStaff } from "@/modules/accounts/auth";
+import { offerStatusLabels, offerStatusTones } from "../logic";
 import { listOffers, type OfferListItem, type OfferStatus } from "../queries";
-import { DecideButtons, WithdrawButton } from "./offer-actions";
+import { OfferActions } from "./offer-actions";
 
 const FILTERS: { label: string; value: OfferStatus | undefined }[] = [
   { label: "All", value: undefined },
@@ -22,19 +24,8 @@ const FILTERS: { label: string; value: OfferStatus | undefined }[] = [
   { label: "Withdrawn", value: "withdrawn" },
 ];
 
-const STATUS_VARIANT: Record<
-  OfferStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  offered: "secondary",
-  accepted: "default",
-  arrived: "default",
-  declined: "destructive",
-  withdrawn: "outline",
-};
-
-// Single source of truth for valid statuses; STATUS_VARIANT is exhaustive.
-const KNOWN = Object.keys(STATUS_VARIANT) as OfferStatus[];
+// Single source of truth for valid statuses; the tone map is exhaustive.
+const KNOWN = Object.keys(offerStatusTones) as OfferStatus[];
 
 function asStatus(raw: string | string[] | undefined): OfferStatus | undefined {
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -59,7 +50,7 @@ export async function OffersView({
           return (
             <Link
               key={f.label}
-              href={f.value ? `/buying?status=${f.value}` : "/buying"}
+              href={f.value ? `/selling?status=${f.value}` : "/selling"}
               className={cn(
                 badgeVariants({ variant: active ? "default" : "outline" }),
               )}
@@ -73,24 +64,27 @@ export async function OffersView({
       {offers.length === 0 ? (
         <p className="text-sm text-muted-foreground">No offers.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ref</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Variety</TableHead>
-              <TableHead className="text-right">Est. kg</TableHead>
-              <TableHead>Harvest</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {offers.map((offer) => (
-              <OfferRow key={offer.id} offer={offer} isManager={isManager} />
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader className="bg-muted [&_th]:text-xs [&_th]:font-bold [&_th]:tracking-wide [&_th]:uppercase">
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead className="text-right">Est. kg</TableHead>
+                <TableHead>Harvest</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {offers.map((offer) => (
+                <OfferRow key={offer.id} offer={offer} isManager={isManager} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
@@ -107,20 +101,25 @@ function OfferRow({
   return (
     <TableRow>
       <TableCell className="font-mono">{offer.ref}</TableCell>
-      <TableCell>{offer.client?.name ?? "—"}</TableCell>
-      <TableCell>{offer.variety?.code ?? "—"}</TableCell>
-      <TableCell className="text-right">{formatKg(offer.est_kg)}</TableCell>
-      <TableCell>{offer.harvest_date}</TableCell>
       <TableCell>
-        <Badge variant={STATUS_VARIANT[offer.status]}>{offer.status}</Badge>
+        <div className="flex flex-col">
+          <span>{offer.client?.name ?? "—"}</span>
+          {offer.variety ? (
+            <span className="text-xs text-muted-foreground">
+              {offer.variety.code}
+            </span>
+          ) : null}
+        </div>
+      </TableCell>
+      <TableCell className="text-right">{formatKg(offer.est_kg)}</TableCell>
+      <TableCell>{formatDate(offer.harvest_date)}</TableCell>
+      <TableCell>
+        <StatusBadge tone={offerStatusTones[offer.status]}>
+          {offerStatusLabels[offer.status]}
+        </StatusBadge>
       </TableCell>
       <TableCell>
-        {decidable && (
-          <div className="flex items-center justify-end gap-2">
-            {isManager && <DecideButtons id={offer.id} />}
-            <WithdrawButton id={offer.id} />
-          </div>
-        )}
+        {decidable && <OfferActions id={offer.id} isManager={isManager} />}
       </TableCell>
     </TableRow>
   );

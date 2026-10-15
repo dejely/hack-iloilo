@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@/components/date-picker";
+import { OptionSelect } from "@/components/option-select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +15,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatDate, formatKg } from "@/lib/format";
 import { offerOnline, type OfferOnlineResult } from "../actions";
@@ -94,7 +91,7 @@ export function WebOfferForm({
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
-          We texted this ref to your phone. We&apos;ll text you again once the
+          We texted this code to your phone. We&apos;ll text you again once the
           manager decides.
         </p>
         <Button
@@ -138,29 +135,33 @@ export function WebOfferForm({
             aria-invalid={!!errors.phone}
             disabled={pending}
           />
-          <FieldDescription>We text your offer ref here.</FieldDescription>
+          <FieldDescription>We text your offer code here.</FieldDescription>
           <FieldError errors={[errors.phone]} />
         </Field>
         <Field data-invalid={!!errors.municipalityId}>
           <FieldLabel htmlFor={`${formId}-municipality`}>
             Municipality
           </FieldLabel>
-          <NativeSelect
-            id={`${formId}-municipality`}
-            className="w-full"
-            {...form.register("municipalityId")}
-            aria-invalid={!!errors.municipalityId}
-            disabled={pending}
-          >
-            <NativeSelectOption value="" disabled>
-              Choose your municipality
-            </NativeSelectOption>
-            {municipalities.map((m) => (
-              <NativeSelectOption key={m.id} value={m.id}>
-                {m.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <Controller
+            control={form.control}
+            name="municipalityId"
+            render={({ field }) => (
+              <OptionSelect
+                id={`${formId}-municipality`}
+                options={municipalities.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                }))}
+                placeholder="Choose your municipality"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                triggerRef={field.ref}
+                invalid={!!errors.municipalityId}
+                disabled={pending}
+              />
+            )}
+          />
           <FieldError errors={[errors.municipalityId]} />
         </Field>
         <Field data-invalid={!!errors.estKg}>
@@ -180,20 +181,26 @@ export function WebOfferForm({
         </Field>
         <Field data-invalid={!!errors.varietyId}>
           <FieldLabel htmlFor={`${formId}-variety`}>Variety</FieldLabel>
-          <NativeSelect
-            id={`${formId}-variety`}
-            className="w-full"
-            {...form.register("varietyId")}
-            aria-invalid={!!errors.varietyId}
-            disabled={pending}
-          >
-            <NativeSelectOption value="">Not sure</NativeSelectOption>
-            {varieties.map((v) => (
-              <NativeSelectOption key={v.id} value={v.id}>
-                {v.code} — {v.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <Controller
+            control={form.control}
+            name="varietyId"
+            render={({ field }) => (
+              <OptionSelect
+                id={`${formId}-variety`}
+                options={varieties.map((v) => ({
+                  value: v.id,
+                  label: `${v.code} — ${v.name}`,
+                }))}
+                none="Not sure"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                triggerRef={field.ref}
+                invalid={!!errors.varietyId}
+                disabled={pending}
+              />
+            )}
+          />
           <FieldDescription>Optional.</FieldDescription>
           <FieldError errors={[errors.varietyId]} />
         </Field>

@@ -5,6 +5,8 @@ import { Controller, type FieldValues, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { DateTimePicker } from "@/components/date-time-picker";
+import { OptionSelect } from "@/components/option-select";
+import { InfoIcon } from "@/components/hint-icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +16,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Spinner } from "@/components/ui/spinner";
 import { joinManila, splitManila } from "@/lib/dates";
@@ -187,9 +185,13 @@ function ReceivingForm({
   const pctField = (
     name: "damaged_pct" | "immature_pct" | "foreign_pct",
     label: string,
+    info: string,
   ) => (
     <Field data-invalid={!!errors[name]}>
-      <FieldLabel htmlFor={`${formId}-${name}`}>{label}</FieldLabel>
+      <FieldLabel htmlFor={`${formId}-${name}`}>
+        {label}
+        <InfoIcon text={info} />
+      </FieldLabel>
       <Input
         id={`${formId}-${name}`}
         type="number"
@@ -215,7 +217,10 @@ function ReceivingForm({
       submitLabel={pending ? "Saving…" : "Save receiving"}
     >
       <Field data-invalid={!!errors.bags}>
-        <FieldLabel htmlFor={`${formId}-bags`}>Sacks</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-bags`}>
+          Sacks
+          <InfoIcon text="Number of sacks. Each sack's own weight comes off the paid weight." />
+        </FieldLabel>
         <Input
           id={`${formId}-bags`}
           type="number"
@@ -229,7 +234,10 @@ function ReceivingForm({
         <FieldError errors={[errors.bags]} />
       </Field>
       <Field data-invalid={!!errors.net_kg}>
-        <FieldLabel htmlFor={`${formId}-net`}>Net weight (kg)</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-net`}>
+          Net weight (kg)
+          <InfoIcon text="Palay weight on the scale, without the truck." />
+        </FieldLabel>
         <Input
           id={`${formId}-net`}
           type="number"
@@ -244,24 +252,33 @@ function ReceivingForm({
       </Field>
       <Field data-invalid={!!errors.variety_id}>
         <FieldLabel htmlFor={`${formId}-variety`}>Variety</FieldLabel>
-        <NativeSelect
-          id={`${formId}-variety`}
-          className="w-full"
-          aria-invalid={!!errors.variety_id}
-          disabled={pending}
-          {...form.register("variety_id")}
-        >
-          <NativeSelectOption value="">Not recorded</NativeSelectOption>
-          {varieties.map((v) => (
-            <NativeSelectOption key={v.id} value={v.id}>
-              {v.code} — {v.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="variety_id"
+          render={({ field }) => (
+            <OptionSelect
+              id={`${formId}-variety`}
+              options={varieties.map((v) => ({
+                value: v.id,
+                label: `${v.code} — ${v.name}`,
+              }))}
+              none="Not recorded"
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              triggerRef={field.ref}
+              invalid={!!errors.variety_id}
+              disabled={pending}
+            />
+          )}
+        />
         <FieldError errors={[errors.variety_id]} />
       </Field>
       <Field data-invalid={!!errors.mc}>
-        <FieldLabel htmlFor={`${formId}-mc`}>Moisture content (%)</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-mc`}>
+          Moisture content (%)
+          <InfoIcon text="Water in the palay, from the moisture meter. Wetter palay gets a lower price per kg." />
+        </FieldLabel>
         <Input
           id={`${formId}-mc`}
           type="number"
@@ -275,9 +292,21 @@ function ReceivingForm({
         />
         <FieldError errors={[errors.mc]} />
       </Field>
-      {pctField("damaged_pct", "Damaged (%)")}
-      {pctField("immature_pct", "Immature (%)")}
-      {pctField("foreign_pct", "Foreign matter (%)")}
+      {pctField(
+        "damaged_pct",
+        "Damaged (%)",
+        "Share of the delivery that is broken, discolored or damaged grain. Part of it comes off the paid weight.",
+      )}
+      {pctField(
+        "immature_pct",
+        "Immature (%)",
+        "Share of the delivery that is unfilled or green grain. Part of it comes off the paid weight.",
+      )}
+      {pctField(
+        "foreign_pct",
+        "Foreign matter (%)",
+        "Share of the delivery that is stones, straw, dirt or weed seeds. It comes off the paid weight.",
+      )}
     </StageCard>
   );
 }
@@ -331,20 +360,26 @@ function ReceivedForms({
     >
       <Field data-invalid={!!errors.dryer_id}>
         <FieldLabel htmlFor={`${formId}-dryer`}>Dryer</FieldLabel>
-        <NativeSelect
-          id={`${formId}-dryer`}
-          className="w-full"
-          aria-invalid={!!errors.dryer_id}
-          disabled={pending}
-          {...form.register("dryer_id")}
-        >
-          <NativeSelectOption value="">Choose a dryer…</NativeSelectOption>
-          {dryers.map((d) => (
-            <NativeSelectOption key={d.id} value={d.id}>
-              {d.code}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="dryer_id"
+          render={({ field }) => (
+            <OptionSelect
+              id={`${formId}-dryer`}
+              options={dryers.map((d) => ({
+                value: d.id,
+                label: d.code,
+              }))}
+              none="Choose a dryer…"
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              triggerRef={field.ref}
+              invalid={!!errors.dryer_id}
+              disabled={pending}
+            />
+          )}
+        />
         <FieldError errors={[errors.dryer_id]} />
       </Field>
       <Controller
@@ -444,7 +479,10 @@ function FinishDryingForm({
         )}
       />
       <Field data-invalid={!!errors.mc_out}>
-        <FieldLabel htmlFor={`${formId}-mc`}>Moisture out (%)</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-mc`}>
+          Moisture out (%)
+          <InfoIcon text="Moisture after drying, from the moisture meter. Palay is dry enough to store at about 14%." />
+        </FieldLabel>
         <Input
           id={`${formId}-mc`}
           type="number"
@@ -506,20 +544,26 @@ function StartMillingForm({
     >
       <Field data-invalid={!!errors.mill_id}>
         <FieldLabel htmlFor={`${formId}-mill`}>Mill</FieldLabel>
-        <NativeSelect
-          id={`${formId}-mill`}
-          className="w-full"
-          aria-invalid={!!errors.mill_id}
-          disabled={pending}
-          {...form.register("mill_id")}
-        >
-          <NativeSelectOption value="">Choose a mill…</NativeSelectOption>
-          {mills.map((m) => (
-            <NativeSelectOption key={m.id} value={m.id}>
-              {m.code}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="mill_id"
+          render={({ field }) => (
+            <OptionSelect
+              id={`${formId}-mill`}
+              options={mills.map((m) => ({
+                value: m.id,
+                label: m.code,
+              }))}
+              none="Choose a mill…"
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              triggerRef={field.ref}
+              invalid={!!errors.mill_id}
+              disabled={pending}
+            />
+          )}
+        />
         <FieldError errors={[errors.mill_id]} />
       </Field>
       <Controller
@@ -591,7 +635,10 @@ function FinishMillingForm({ batchId }: { batchId: string }) {
         )}
       />
       <Field data-invalid={!!errors.mill_in_kg}>
-        <FieldLabel htmlFor={`${formId}-in`}>Into the mill (kg)</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-in`}>
+          Into the mill (kg)
+          <InfoIcon text="Dried palay fed into the mill. Recovery is rice out divided by this." />
+        </FieldLabel>
         <Input
           id={`${formId}-in`}
           type="number"

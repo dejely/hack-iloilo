@@ -458,30 +458,26 @@ export function storeMillLater(input: {
   return out;
 }
 
-/** The card's plain-language note on why and what it gains, from its facts only. */
+/**
+ * The card's one-line note: what to do, from its facts only. Anything left
+ * over shows as its own badge, so the note leaves it out.
+ */
 export function templateNote(p: Suggestion): string {
   const f = p.facts;
   switch (p.kind) {
     case "move_bookings": {
       const n = Number(f.bookings_moved);
-      const moving = `Moving ${n} flexible ${n === 1 ? "booking" : "bookings"} to ${f.new_days}`;
-      return p.remainderKg === 0
-        ? `${moving} clears it without turning anyone away.`
-        : `${moving} leaves ${f.remainder} over.`;
+      return `Move ${n} flexible ${n === 1 ? "booking" : "bookings"} to ${f.new_days}.`;
     }
     case "mill_full_loads": {
       const n = Number(f.spread_days) - Number(f.full_days);
-      return `Base load runs ${n} fewer ${n === 1 ? "day" : "days"}, saving ${f.saving_per_kg}/kg in electricity.`;
+      return `${n} fewer base-load ${n === 1 ? "day" : "days"}, saves ${f.saving_per_kg}/kg.`;
     }
-    case "store_mill_later": {
-      const store = `Store ${f.stored} of dried palay and mill it on ${f.mill_days}, when the mill is quiet`;
-      return p.remainderKg === 0
-        ? `${store}.`
-        : `${store}. That leaves ${f.remainder} over.`;
-    }
+    case "store_mill_later":
+      return `Store ${f.stored} dried, mill on ${f.mill_days}.`;
     case "fill_idle": {
       const n = Number(f.recipients);
-      return `Text today's rates and buying price to ${n} ${n === 1 ? "farmer or co-op" : "farmers and co-ops"} with no booking.`;
+      return `Text prices to ${n} ${n === 1 ? "client" : "clients"} with no booking.`;
     }
   }
 }

@@ -41,8 +41,7 @@ export default function SuggestionsPage() {
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Suggestions</h1>
           <p className="text-sm text-muted-foreground">
-            Computed from capacity over the next three weeks. Accept or dismiss
-            each.
+            Actions for the next three weeks
           </p>
         </header>
         <Suspense fallback={<Skeleton className="h-64" />}>

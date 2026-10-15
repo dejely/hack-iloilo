@@ -15,7 +15,8 @@ import {
   type FacilityFormDefaults,
 } from "@/modules/setup/components/facility-form";
 import { MachinesTable } from "@/modules/setup/components/machines-table";
-import { UnconfirmedIcon } from "@/modules/setup/components/hint-icons";
+import { UnconfirmedIcon } from "@/components/hint-icons";
+import { ServiceIcon, type ServiceIconKind } from "@/components/service-icon";
 import { capacitySettings } from "@/modules/setup/queries";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -43,14 +44,17 @@ async function Settings() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
+          icon="dryer"
           label="Dryer capacity"
           value={`${formatTonnes(dryerKgPerDay)}/day`}
         />
         <Stat
+          icon="mill"
           label="Mill capacity"
           value={`${formatTonnes(millKgPerDay)}/day`}
         />
         <Stat
+          icon="storage"
           label="Storage"
           value={formatTonnes(facility.storage_capacity_kg)}
           confirmed
@@ -81,10 +85,12 @@ async function Settings() {
 }
 
 function Stat({
+  icon,
   label,
   value,
   confirmed,
 }: {
+  icon: ServiceIconKind;
   label: string;
   value: string;
   confirmed?: boolean;
@@ -93,6 +99,7 @@ function Stat({
     <Card size="sm">
       <CardHeader>
         <CardDescription className="flex items-center gap-2">
+          <ServiceIcon kind={icon} className="size-4 text-primary" />
           {label}
           {!confirmed && <UnconfirmedIcon />}
         </CardDescription>

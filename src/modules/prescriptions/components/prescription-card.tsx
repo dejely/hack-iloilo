@@ -1,8 +1,16 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  ChevronRight,
+  MessageSquareText,
+} from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { InfoIcon } from "@/components/hint-icons";
+import { ServiceIcon } from "@/components/service-icon";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +45,25 @@ const kindLabels: Record<Prescription["kind"], string> = {
   store_mill_later: "Store now, mill later",
 };
 
+const kindIcons: Record<Prescription["kind"], React.ReactNode> = {
+  move_bookings: <CalendarClock aria-hidden />,
+  fill_idle: <MessageSquareText aria-hidden />,
+  mill_full_loads: <ServiceIcon kind="mill" />,
+  store_mill_later: <ServiceIcon kind="storage" />,
+};
+
+/** What accepting each kind does, for its hint. */
+const kindInfo: Record<Prescription["kind"], string> = {
+  move_bookings:
+    "Texts clients with flexible bookings to come on a quieter day, so the full day fits.",
+  fill_idle:
+    "Texts clients with no booking today's prices, to bring palay on quiet days.",
+  mill_full_loads:
+    "Mills on fewer, fuller days. The plant's base power, paid on every running day, is paid on fewer days.",
+  store_mill_later:
+    "Keeps dried palay in storage and mills it on quiet mill days.",
+};
+
 /** Recipients listed by name before "+N". */
 const SHOWN_RECIPIENTS = 3;
 
@@ -56,29 +83,32 @@ export function PrescriptionCard({
     });
 
   return (
-    <Card size="sm" className="h-full">
-      <CardHeader>
-        <span className="text-xs font-medium text-muted-foreground">
-          {kindLabels[p.kind]}
-        </span>
-        <CardTitle>{p.title}</CardTitle>
+    <Card className="h-full">
+      <CardHeader className="gap-2">
+        <div className="flex items-center gap-1.5">
+          <Badge variant="secondary">
+            {kindIcons[p.kind]}
+            {kindLabels[p.kind]}
+          </Badge>
+          <InfoIcon text={kindInfo[p.kind]} />
+        </div>
+        <CardTitle className="text-lg leading-snug">{p.title}</CardTitle>
         <CardDescription className="text-pretty">
           {templateNote(p)}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-2">
+      <CardContent className="flex flex-1 flex-col gap-3">
         {p.kind === "move_bookings" && <Moves p={p} />}
         {p.kind === "fill_idle" && <Recipients p={p} />}
         {p.kind === "mill_full_loads" && <MillPlans p={p} />}
         {p.kind === "store_mill_later" && <MillLater p={p} />}
       </CardContent>
       <CardFooter className="gap-2">
-        <Button size="sm" disabled={pending} onClick={() => decide("accepted")}>
+        <Button disabled={pending} onClick={() => decide("accepted")}>
           {accept}
         </Button>
         <Button
-          size="sm"
-          variant="ghost"
+          variant="outline"
           disabled={pending}
           onClick={() => decide("dismissed")}
         >
@@ -110,13 +140,9 @@ function Rows({
   );
 }
 
-function Remainder({ kg, why }: { kg: number; why: string }) {
+function Remainder({ kg }: { kg: number }) {
   if (kg <= 0) return null;
-  return (
-    <Badge variant="warning">
-      {formatTonnes(kg)} still over: {why}
-    </Badge>
-  );
+  return <StatusBadge tone="danger">{formatTonnes(kg)} still over</StatusBadge>;
 }
 
 function Moves({ p }: { p: MoveBookingsPrescription }) {
@@ -128,8 +154,10 @@ function Moves({ p }: { p: MoveBookingsPrescription }) {
           label: (
             <>
               {m.client}{" "}
-              <span className="text-muted-foreground">
-                {m.ref} → {shortDay(m.to)}
+              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                {m.ref}
+                <ArrowRight aria-label="to" className="size-3.5" />
+                {shortDay(m.to)}
               </span>
             </>
           ),
@@ -138,10 +166,10 @@ function Moves({ p }: { p: MoveBookingsPrescription }) {
       />
       {p.incomingKg > 0 && (
         <p className="text-xs text-muted-foreground">
-          Includes {formatTonnes(p.incomingKg)} already asked to move here.
+          +{formatTonnes(p.incomingKg)} already asked to move here
         </p>
       )}
-      <Remainder kg={p.remainderKg} why="no flexible booking fits" />
+      <Remainder kg={p.remainderKg} />
     </>
   );
 }
@@ -209,7 +237,7 @@ function MillLater({ p }: { p: StoreMillLaterPrescription }) {
           value: formatTonnes(m.kg),
         }))}
       />
-      <Remainder kg={p.remainderKg} why="no storage room or quiet mill day" />
+      <Remainder kg={p.remainderKg} />
     </>
   );
 }

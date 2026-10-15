@@ -2,6 +2,7 @@
 // Pure functions only: no I/O and no imports from other modules. Unit-test here.
 
 import { addDays, daysBetween } from "@/lib/dates";
+import type { StatusTone } from "@/lib/status";
 import type { DayPool, Pool, Range, Source } from "./types";
 
 export const sources = ["confirmed", "offer", "forecast"] as const;
@@ -358,6 +359,13 @@ export function headline(days: DayPool[]): {
 
 /** One pool's state on the plant view. */
 export type PlantStatus = "over" | "near" | "ok" | "idle";
+
+export const plantStatusTones: Record<PlantStatus, StatusTone> = {
+  over: "danger",
+  near: "warning",
+  ok: "success",
+  idle: "neutral",
+};
 
 /** Expected load at or above this share of capacity is near full. */
 export const NEAR_FULL = 0.85;

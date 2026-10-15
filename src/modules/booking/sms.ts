@@ -37,19 +37,19 @@ registerCommand({
 
 registerCommand({
   keywords: ["CANCEL"],
-  usage: "CANCEL <ref>",
+  usage: "CANCEL <code>",
   schema: cancelSmsSchema,
   parse: (args) => (args.length === 1 ? { ref: args[0].toUpperCase() } : null),
   handle: cancelBySms,
   ai: {
-    description: "Cancel a booking by its 6-character ref.",
+    description: "Cancel a booking by its 6-character code.",
     summary: ({ ref }) => `i-cancel ang booking ${ref}`,
   },
 });
 
 registerCommand({
   keywords: ["MOVE"],
-  usage: "MOVE <ref> <dd/mm> [+days]",
+  usage: "MOVE <code> <dd/mm> [+days]",
   schema: moveSmsSchema,
   parse: parseMoveArgs,
   handle: moveBySms,

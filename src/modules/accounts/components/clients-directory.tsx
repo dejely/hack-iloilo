@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -130,12 +129,6 @@ export function ClientsDirectory({
               onEdit={edit}
             />
           )}
-          <Alert>
-            <AlertDescription>
-              Staff have encoder or manager access. Only managers see costs, set
-              prices and act on suggestions.
-            </AlertDescription>
-          </Alert>
         </div>
         <aside
           aria-label="Quick registration"
@@ -159,11 +152,6 @@ export function ClientsDirectory({
               />
             </CardContent>
           </Card>
-          <Alert>
-            <AlertDescription>
-              Use the same phone number for walk-ins and SMS.
-            </AlertDescription>
-          </Alert>
         </aside>
       </div>
       <Sheet

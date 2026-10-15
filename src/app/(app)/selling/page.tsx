@@ -1,25 +1,20 @@
 import type { Metadata } from "next";
+import { Calculator } from "lucide-react";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ToolDialog } from "@/components/tool-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayManila } from "@/lib/dates";
 import { clientsDirectory } from "@/modules/accounts/queries";
-import { BudgetCard } from "@/modules/buying/components/budget-card";
-import { OfferForm } from "@/modules/buying/components/offer-form";
+import { BudgetButton } from "@/modules/buying/components/budget-button";
+import { NewOfferSheet } from "@/modules/buying/components/new-offer-sheet";
 import { OffersView } from "@/modules/buying/components/offers-view";
 import type { BuyRules } from "@/modules/pricing/logic";
 import { QuoteCalculator } from "@/modules/pricing/components/quote-calculator";
 import { priceOn } from "@/modules/pricing/queries";
 import { listVarieties } from "@/modules/setup/queries";
 
-export const metadata: Metadata = { title: "Buying" };
+export const metadata: Metadata = { title: "Selling" };
 
 async function NewOffer() {
   // Reference data read fresh per request; defer past the prerendered shell.
@@ -29,7 +24,7 @@ async function NewOffer() {
     listVarieties(),
   ]);
   return (
-    <OfferForm
+    <NewOfferSheet
       clients={clients
         .map((c) => ({ id: c.id, name: c.name, phone: c.phone }))
         .sort((a, b) => a.name.localeCompare(b.name))}
@@ -63,56 +58,43 @@ async function Quote() {
   return <QuoteCalculator priceRule={priceRule} />;
 }
 
-export default function BuyingPage({ searchParams }: PageProps<"/buying">) {
+export default function SellingPage({ searchParams }: PageProps<"/selling">) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <div className="flex flex-col gap-6">
-        <Suspense fallback={<Skeleton className="h-64" />}>
-          <BudgetCard />
-        </Suspense>
-
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Quote calculator</CardTitle>
-            <CardDescription>
-              Estimate a buying price from MC. Skips deductions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+    <section className="flex min-w-0 flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Selling</h1>
+          <p className="text-sm text-muted-foreground">
+            Offers by harvest date · managers accept or decline
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Suspense fallback={<Skeleton className="h-8 w-44" />}>
+            <BudgetButton />
+          </Suspense>
+          <ToolDialog
+            trigger={
+              <>
+                <Calculator data-icon="inline-start" />
+                Quote calculator
+              </>
+            }
+            title="Quote calculator"
+            description="Estimate a buying price from MC. Skips deductions."
+          >
             <Suspense fallback={<Skeleton className="h-64" />}>
               <Quote />
             </Suspense>
-          </CardContent>
-        </Card>
-
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>New sell offer</CardTitle>
-            <CardDescription>
-              Record a client&apos;s offer to sell palay.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<Skeleton className="h-96" />}>
-              <NewOffer />
-            </Suspense>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Buying list</CardTitle>
-          <CardDescription>
-            Offers by harvest date. Managers accept or decline.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<Skeleton className="h-96" />}>
-            <OffersView searchParams={searchParams} />
+          </ToolDialog>
+          <Suspense fallback={<Skeleton className="h-8 w-32" />}>
+            <NewOffer />
           </Suspense>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </header>
+
+      <Suspense fallback={<Skeleton className="h-96" />}>
+        <OffersView searchParams={searchParams} />
+      </Suspense>
+    </section>
   );
 }

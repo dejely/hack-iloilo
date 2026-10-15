@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,7 +15,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatKg } from "@/lib/format";
 import type { Database } from "@/lib/supabase/database.types";
 import { confirmBatchWeightInPerson } from "../actions";
-import type { WeightMeasurements } from "../logic";
+import {
+  type WeightMeasurements,
+  type WeightStatus,
+  weightStatusLabels,
+  weightStatusTones,
+} from "../logic";
 
 type Confirmation =
   Database["public"]["Tables"]["batch_weight_confirmations"]["Row"];
@@ -46,17 +51,9 @@ export function WeightConfirmations({
                 <span className="font-medium">
                   {c.stage === "receiving" ? "Receiving" : "After drying"}
                 </span>
-                <Badge
-                  variant={
-                    c.status === "disputed" ? "destructive" : "secondary"
-                  }
-                >
-                  {c.status === "disputed"
-                    ? "Disputed — re-weigh"
-                    : c.status === "confirmed"
-                      ? "Confirmed"
-                      : "Pending"}
-                </Badge>
+                <StatusBadge tone={weightStatusTones[c.status as WeightStatus]}>
+                  {weightStatusLabels[c.status as WeightStatus]}
+                </StatusBadge>
               </div>
               <p className="text-sm text-muted-foreground">
                 {m.bags != null ? `${m.bags} bags · ` : ""}

@@ -57,7 +57,7 @@ export async function bookingSlipJpeg(slip: BookingSlip): Promise<Blob> {
 
   ctx.fillStyle = MUTED;
   ctx.font = `500 32px ${sans}`;
-  ctx.fillText("Booking ref", PAD, 360);
+  ctx.fillText("Booking code", PAD, 360);
   ctx.fillStyle = INK;
   ctx.font = `700 150px ${mono}`;
   if ("letterSpacing" in ctx) ctx.letterSpacing = "16px";

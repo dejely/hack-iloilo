@@ -14,7 +14,8 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar staff={staff} />
-      <SidebarInset>
+      {/* min-w-0 lets wide tables scroll in place instead of widening the page. */}
+      <SidebarInset className="min-w-0">
         <header className="flex h-12 items-center gap-2 border-b px-4">
           <SidebarTrigger />
         </header>

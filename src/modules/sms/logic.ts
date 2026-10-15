@@ -2,6 +2,25 @@
 // Pure functions only: no I/O and no imports from other modules. Unit-test here.
 
 import { addDays } from "@/lib/dates";
+import type { StatusTone } from "@/lib/status";
+import type { Database } from "@/lib/supabase/database.types";
+
+type SmsStatus = Database["public"]["Enums"]["sms_status"];
+
+export const smsStatusLabels: Record<SmsStatus, string> = {
+  received: "Received",
+  processed: "Processed",
+  queued: "Queued",
+  sent: "Sent",
+  failed: "Failed",
+};
+export const smsStatusTones: Record<SmsStatus, StatusTone> = {
+  received: "neutral",
+  processed: "success",
+  queued: "info",
+  sent: "success",
+  failed: "danger",
+};
 
 /** Max SMS length (two GSM-7 segments). */
 export const SMS_MAX_CHARS = 320;

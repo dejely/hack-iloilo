@@ -1,8 +1,9 @@
 "use client";
 
+import { ServiceIcon, isServiceIconKind } from "@/components/service-icon";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Badge } from "@/components/ui/badge";
+import { InfoIcon } from "@/components/hint-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -121,15 +122,16 @@ export function CapacityView({
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Capacity</h1>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
+            {range.from === today && "Today, "}
             {span(range.from, range.to)}
-            <Badge>Today, {shortDay(today)}</Badge>
           </p>
         </div>
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList aria-label="View">
             {tabs.map((t) => (
               <TabsTrigger key={t} value={t}>
+                {isServiceIconKind(t) ? <ServiceIcon kind={t} /> : null}
                 {tabNames[t]}
               </TabsTrigger>
             ))}
@@ -250,6 +252,7 @@ function Headline({
     >
       <Tile
         label={`${poolNames[pool]} use`}
+        info="Expected load over capacity for these weeks: bookings and offers plus the harvest forecast."
         value={h.utilizationPct === null ? "—" : `${h.utilizationPct}%`}
         note={`${plainTonnes(h.expectedKg)} of ${formatTonnes(h.capacityKg)}`}
       />
@@ -286,18 +289,21 @@ function Headline({
 
 function Tile({
   label,
+  info,
   value,
   note,
 }: {
   label: string;
+  info?: string;
   value: string;
   note: string;
 }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
-        <span className="text-sm font-semibold text-muted-foreground">
+        <span className="flex items-center gap-1 text-sm font-semibold text-muted-foreground">
           {label}
+          {info ? <InfoIcon text={info} /> : null}
         </span>
         <span className="text-4xl font-bold tracking-tight tabular-nums">
           {value}

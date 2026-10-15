@@ -94,7 +94,7 @@ export async function checkInClient(input: unknown): Promise<CheckInResult> {
     const entry = await checkIn(params);
     revalidatePath("/queue");
     if (mode === "booking") revalidatePath("/bookings");
-    if (mode === "offer") revalidatePath("/buying");
+    if (mode === "offer") revalidatePath("/selling");
     return { status: "ok", entryId: entry.id };
   } catch (error) {
     if (error instanceof GateError)
@@ -118,7 +118,7 @@ export async function checkInClient(input: unknown): Promise<CheckInResult> {
 export async function lookupRef(ref: string): Promise<LookupRefResult> {
   await requireRole();
   if (typeof ref !== "string")
-    return { status: "error", message: "Enter the ref." };
+    return { status: "error", message: "Enter the code." };
   try {
     return { status: "ok", preview: await refPreview(ref) };
   } catch (error) {
@@ -127,7 +127,7 @@ export async function lookupRef(ref: string): Promise<LookupRefResult> {
     console.error("Unable to look up ref", error);
     return {
       status: "error",
-      message: "Unable to look up the ref. Please try again.",
+      message: "Unable to look up the code. Please try again.",
     };
   }
 }

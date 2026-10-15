@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { ServiceIcon } from "@/components/service-icon";
+import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ import {
   type QueueLine as Line,
 } from "../logic";
 import type { QueueRow, Service } from "../types";
+import { BatchLink } from "./batch-link";
 
 const clock = new Intl.DateTimeFormat("en-PH", {
   hour: "numeric",
@@ -106,16 +108,29 @@ export function QueueLine({
   };
 
   return (
-    <Card className="min-h-[32rem]">
+    <Card className="min-h-[32rem] lg:min-h-0">
       <CardHeader>
-        <CardTitle>{name} line</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <ServiceIcon kind={service} className="size-4 text-primary" />
+          {name} line
+        </CardTitle>
         <CardAction>
           <Badge variant="secondary">{line.waiting.length} waiting</Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
         {line.serving.map((row) => (
-          <Item key={row.id} variant="muted">
+          <Item key={row.id} variant="muted" className="relative shrink-0">
+            <svg
+              aria-hidden
+              className="pointer-events-none absolute inset-0 size-full overflow-visible"
+            >
+              <rect
+                strokeWidth={1}
+                strokeDasharray="8 4"
+                className="h-full w-full fill-none stroke-primary [rx:var(--radius-lg)] motion-safe:animate-dash-march"
+              />
+            </svg>
             <ItemContent>
               <ItemDescription className="text-xs font-medium uppercase">
                 Now serving
@@ -126,12 +141,7 @@ export function QueueLine({
               </ItemTitle>
               <ItemDescription>
                 {row.batch ? (
-                  <Link
-                    href={`/batches/${row.batch.id}`}
-                    className="underline underline-offset-4"
-                  >
-                    Batch {row.batch.batch_no}
-                  </Link>
+                  <BatchLink id={row.batch.id} batchNo={row.batch.batch_no} />
                 ) : (
                   "No batch"
                 )}
@@ -158,11 +168,11 @@ export function QueueLine({
           </Item>
         ))}
         {line.waiting.length ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
             <h3 className="text-xs font-medium text-muted-foreground uppercase">
               Waiting
             </h3>
-            <ItemGroup className="gap-2">
+            <ItemGroup className="min-h-0 gap-2 overflow-y-auto">
               {line.waiting.map((row, index) => (
                 <Item key={row.id} variant="outline" size="sm">
                   <ItemMedia>
@@ -180,7 +190,7 @@ export function QueueLine({
                   </ItemContent>
                   <ItemActions>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       disabled={pending}
                       aria-label={`${row.client.name} left the queue`}
@@ -211,6 +221,8 @@ export function QueueLine({
       </CardContent>
       <CardFooter>
         <Button
+          size="lg"
+          className="w-full"
           disabled={!next || pending}
           onClick={() => {
             if (!next) return;
@@ -241,7 +253,15 @@ export function QueueLine({
           {busy && busy === next?.id ? (
             <Spinner data-icon="inline-start" />
           ) : null}
-          {next ? "Start next → opens batch" : "Start next"}
+          {next ? (
+            <>
+              Start next
+              <ArrowRight />
+              opens batch
+            </>
+          ) : (
+            "Start next"
+          )}
         </Button>
       </CardFooter>
       <AlertDialog

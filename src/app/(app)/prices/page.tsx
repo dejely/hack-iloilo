@@ -14,7 +14,10 @@ import {
   PriceForm,
   type PriceFormDefaults,
 } from "@/modules/pricing/components/price-form";
-import { PricesView } from "@/modules/pricing/components/prices-view";
+import {
+  PricesView,
+  PriceTrend,
+} from "@/modules/pricing/components/prices-view";
 import { type BuyRules, livePrice } from "@/modules/pricing/logic";
 import { listPrices } from "@/modules/pricing/queries";
 
@@ -46,35 +49,54 @@ async function SetPrices() {
 export default function PricesPage() {
   return (
     <RoleGate role="manager">
-      <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Prices</CardTitle>
-            <CardDescription>
-              Manager only · a PRICE text replies with today&apos;s prices.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<Skeleton className="h-96" />}>
-              <SetPrices />
-            </Suspense>
-          </CardContent>
-        </Card>
+      {/* The page fills the viewport below the app header; only the history scrolls. */}
+      <section className="flex min-w-0 flex-col gap-6 lg:h-[calc(100svh-5rem)]">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Prices</h1>
+          <p className="text-sm text-muted-foreground">
+            Palay buying, service fee and rice prices by effective date
+          </p>
+        </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>History</CardTitle>
-            <CardDescription>
-              Price rows by effective date. The one in effect today is tagged.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<Skeleton className="h-96" />}>
-              <PricesView />
-            </Suspense>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[400px_1fr]">
+          <Card className="lg:min-h-0 lg:overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Set prices</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<Skeleton className="h-96" />}>
+                <SetPrices />
+              </Suspense>
+            </CardContent>
+          </Card>
+
+          <div className="flex min-h-0 min-w-0 flex-col gap-6">
+            <Card className="shrink-0">
+              <CardHeader>
+                <CardTitle>Trend</CardTitle>
+                <CardDescription>Latest 12 effective dates</CardDescription>
+              </CardHeader>
+              <CardContent className="h-56">
+                <Suspense fallback={<Skeleton className="h-full" />}>
+                  <PriceTrend />
+                </Suspense>
+              </CardContent>
+            </Card>
+
+            <Card className="min-h-80 lg:min-h-0 lg:flex-1">
+              <CardHeader>
+                <CardTitle>History</CardTitle>
+                <CardDescription>Every save, newest first</CardDescription>
+              </CardHeader>
+              <CardContent className="min-h-0 flex-1 [&_[data-slot=table-container]]:h-full [&_[data-slot=table-container]]:overflow-auto">
+                <Suspense fallback={<Skeleton className="h-96" />}>
+                  <PricesView />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
     </RoleGate>
   );
 }

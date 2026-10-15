@@ -30,7 +30,7 @@ export const checkInSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["ref"],
-          message: `Enter the ${REF_LENGTH}-character ref.`,
+          message: `Enter the ${REF_LENGTH}-character code.`,
         });
       return;
     }

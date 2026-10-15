@@ -222,3 +222,13 @@
     var(--brand-accent) 22px 26px
   );
 }
+
+@theme {
+  --animate-dash-march: dash-march 1s linear infinite;
+
+  @keyframes dash-march {
+    to {
+      stroke-dashoffset: -12;
+    }
+  }
+}

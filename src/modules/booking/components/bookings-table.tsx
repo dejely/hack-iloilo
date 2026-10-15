@@ -1,6 +1,9 @@
 "use client";
 
+import { StatusBadge } from "@/components/status-badge";
+import { ServiceLabel } from "@/components/service-icon";
 import { Fragment, useMemo, useState, useTransition } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -12,8 +15,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
+import { InfoIcon } from "@/components/hint-icons";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -30,24 +39,15 @@ import {
   formatShortDate,
   serviceLabels,
   statusLabels,
+  statusTones,
   type BookingGroup,
 } from "../logic";
-import type { BookingClient, BookingRow, BookingStatus } from "../types";
+import type { BookingClient, BookingRow } from "../types";
 
 /** Rows shown per day before `+ N more`. */
 const GROUP_PREVIEW = 6;
-const COLUMNS = 8;
+const COLUMNS = 6;
 const kgFormat = new Intl.NumberFormat("en-US");
-const statusVariants: Record<
-  BookingStatus,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  confirmed: "secondary",
-  reschedule_proposed: "outline",
-  arrived: "default",
-  cancelled: "destructive",
-  no_show: "destructive",
-};
 
 export function BookingsTable({
   groups,
@@ -71,14 +71,22 @@ export function BookingsTable({
     <>
       <div className="overflow-hidden rounded-lg border">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted [&_th]:text-xs [&_th]:font-bold [&_th]:tracking-wide [&_th]:uppercase">
             <TableRow>
-              <TableHead>Ref</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Booked by</TableHead>
+              <TableHead>Code</TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-1">
+                  Client
+                  <InfoIcon text="Below the name: who booked. Self is the client by SMS, Staff is a walk-in, and FOR is someone booking for them." />
+                </span>
+              </TableHead>
               <TableHead className="text-right">Est. kg</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Flex</TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-1">
+                  Date
+                  <InfoIcon text="± days: how far the booking can move if the day fills up." />
+                </span>
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -97,14 +105,16 @@ export function BookingsTable({
                 <Fragment key={key}>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableCell colSpan={COLUMNS} className="font-medium">
-                      {[
-                        formatDay(group.date),
-                        showService ? serviceLabels[group.service] : null,
-                        `${group.count} ${group.count === 1 ? "booking" : "bookings"}`,
-                        formatTonnes(group.totalKg),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      <ServiceLabel kind={group.service}>
+                        {[
+                          formatDay(group.date),
+                          showService ? serviceLabels[group.service] : null,
+                          `${group.count} ${group.count === 1 ? "booking" : "bookings"}`,
+                          formatTonnes(group.totalKg),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </ServiceLabel>
                       <span className="sr-only">
                         {" "}
                         ({formatKg(group.totalKg)})
@@ -114,43 +124,62 @@ export function BookingsTable({
                   {rows.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-mono">{row.ref}</TableCell>
-                      <TableCell>{row.client.name}</TableCell>
-                      <TableCell>{bookedByLabel(row, namesByPhone)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{row.client.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {bookedByLabel(row, namesByPhone)}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {kgFormat.format(row.est_kg)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {formatShortDate(row.scheduled_date)}
+                        {row.flex_days ? (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            ±{row.flex_days} d
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell>
-                        {row.flex_days ? `${row.flex_days} d` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariants[row.status]}>
+                        <StatusBadge tone={statusTones[row.status]}>
                           {statusLabels[row.status]}
-                        </Badge>
+                        </StatusBadge>
                       </TableCell>
                       <TableCell className="text-right">
                         {row.status === "confirmed" ||
                         row.status === "reschedule_proposed" ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label={`Reschedule booking ${row.ref}`}
-                            onClick={() => onReschedule(row)}
-                          >
-                            Reschedule
-                          </Button>
-                        ) : null}
-                        {row.status === "confirmed" ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label={`Cancel booking ${row.ref}`}
-                            onClick={() => setCancelling(row)}
-                          >
-                            Cancel
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Actions for booking ${row.ref}`}
+                                />
+                              }
+                            >
+                              <MoreHorizontal />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => onReschedule(row)}
+                              >
+                                Reschedule
+                              </DropdownMenuItem>
+                              {row.status === "confirmed" ? (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => setCancelling(row)}
+                                >
+                                  Cancel
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         ) : null}
                       </TableCell>
                     </TableRow>

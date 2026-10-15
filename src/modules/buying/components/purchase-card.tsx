@@ -1,3 +1,4 @@
+import { InfoIcon } from "@/components/hint-icons";
 import {
   Card,
   CardContent,
@@ -45,12 +46,23 @@ export async function PurchaseCard({ id }: { id: string }) {
               ["Immature", formatKg(deductions.immature)],
               ["Foreign matter", formatKg(deductions.foreign)],
               ["Sacks", formatKg(deductions.sack)],
-              ["Paid weight", formatKg(purchase.paid_kg)],
-              ["Price", `${formatMoney(purchase.price_minor_per_kg)}/kg`],
-            ] as [string, string][]
-          ).map(([label, value]) => (
+              [
+                "Paid weight",
+                formatKg(purchase.paid_kg),
+                "Net weight minus the deductions above.",
+              ],
+              [
+                "Price",
+                `${formatMoney(purchase.price_minor_per_kg)}/kg`,
+                "The buying base, adjusted for this delivery's moisture.",
+              ],
+            ] as [string, string, string?][]
+          ).map(([label, value, info]) => (
             <div key={label} className="contents">
-              <dt className="text-muted-foreground">{label}</dt>
+              <dt className="flex items-center gap-1 text-muted-foreground">
+                {label}
+                {info ? <InfoIcon text={info} /> : null}
+              </dt>
               <dd className="font-medium">{value}</dd>
             </div>
           ))}
