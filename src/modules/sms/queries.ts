@@ -324,13 +324,19 @@ async function interpret(
   if (!intent) return { reply: help() };
   if (intent.intent.command === "NONE") return { reply: help(true) };
 
-  const { command: keyword, args } = intent.intent as {
+  const { command: keyword, args: read } = intent.intent as {
     command: string;
     args: unknown;
   };
   const command = findCommand(keyword);
   if (!command?.ai) return { reply: help(true) };
 
+  // Code reads plain values too and wins: models miss or misread local
+  // words ("pa galing" is milling, not drying), and code never guesses.
+  const ask = command.ai.ask ?? {};
+  const args = isRecord(read)
+    ? mergeFill(read, command.ai.readReply?.(body), Object.keys(ask))
+    : read;
   const reading = aiSchema(command).safeParse(args);
   if (reading.success)
     return {
@@ -339,7 +345,6 @@ async function interpret(
     };
 
   // Ask only for what's missing; code, not AI, decides what that is.
-  const ask = command.ai.ask ?? {};
   const missing = missingFields(reading.error.issues, Object.keys(ask));
   if (!missing || !isRecord(args)) return { reply: help(true) };
   const payload: FillPayload = {

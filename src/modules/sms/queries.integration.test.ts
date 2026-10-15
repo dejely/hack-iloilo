@@ -399,6 +399,24 @@ describe.skipIf(process.env.RUN_SMS_DB_TESTS !== "1")(
         expect(await fillStatus()).toBe("expired");
       });
 
+      it("fills a value the AI missed from code, without asking", async () => {
+        extract.mockResolvedValueOnce({
+          intent: { command: "FILLTEST", args: { label: "x" } },
+        });
+        await handleInbound({ phone, body: "7" });
+        expect((await lastReply())?.body).toMatch(/fill x=7\?/);
+        await handleInbound({ phone, body: "no" });
+      });
+
+      it("prefers code over a misread AI value", async () => {
+        extract.mockResolvedValueOnce({
+          intent: { command: "FILLTEST", args: { label: "x", n: 1 } },
+        });
+        await handleInbound({ phone, body: "8" });
+        expect((await lastReply())?.body).toMatch(/fill x=8\?/);
+        await handleInbound({ phone, body: "no" });
+      });
+
       it("is not answered once expired", async () => {
         await askForN();
         await db()
