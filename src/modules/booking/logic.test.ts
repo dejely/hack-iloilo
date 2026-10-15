@@ -288,7 +288,7 @@ describe("bookingFromAi", () => {
   });
 });
 
-describe("/track helpers", () => {
+describe("/book/track helpers", () => {
   it("cleans a typed ref to its stored form", () => {
     expect(cleanRef(" k7p-2qx ")).toBe("K7P2QX");
     expect(cleanRef("K7P 2QX")).toBe("K7P2QX");

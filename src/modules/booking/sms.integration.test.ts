@@ -435,7 +435,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       expect(booking.status).toBe("confirmed");
     });
 
-    it("accepts a proposal on /track like YES and ignores a late SMS YES", async () => {
+    it("accepts a proposal on /book/track like YES and ignores a late SMS YES", async () => {
       const booking = await book(`BOOK DRY 700 20/10 ±3 FOR ${beneficiary}`);
       const to = dates.addDays(booking.scheduled_date, 2);
       await proposeReschedule(booking.id, to);
@@ -466,7 +466,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       });
     });
 
-    it("cancels and moves on /track like CANCEL and MOVE, for the client or booker only", async () => {
+    it("cancels and moves on /book/track like CANCEL and MOVE, for the client or booker only", async () => {
       const booking = await book(`BOOK DRY 400 20/10 ±1 FOR ${beneficiary}`);
       const notFound = {
         status: "error",
@@ -519,7 +519,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       });
     });
 
-    it("locks /track for a phone after repeated misses", async () => {
+    it("locks /book/track for a phone after repeated misses", async () => {
       const booking = await book();
       await db().from("track_attempts").delete().eq("phone", stranger);
       for (let i = 0; i < 5; i++)

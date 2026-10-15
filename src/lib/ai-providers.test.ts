@@ -3,9 +3,9 @@ import { attemptTimeout, providerFailure, providerOrder } from "./ai-providers";
 
 describe("AI provider selection", () => {
   it.each([
-    [2, true, ["gemini", "openrouter", "gemini"]],
-    [10, true, ["gemini", "openrouter", "gemini"]],
-    [1, true, ["gemini", "openrouter"]],
+    [2, true, ["openrouter", "gemini", "gemini"]],
+    [10, true, ["openrouter", "gemini", "gemini"]],
+    [1, true, ["openrouter", "gemini"]],
     [2, false, ["gemini", "gemini"]],
     [1, false, ["gemini"]],
     [0, true, ["openrouter"]],
@@ -18,7 +18,7 @@ describe("AI provider selection", () => {
     expect(attemptTimeout(8000, 0, 3)).toBe(4000);
     expect(attemptTimeout(8000, 2000, 2)).toBe(3000);
     expect(attemptTimeout(8000, 5000, 1)).toBe(3000);
-    expect(attemptTimeout(8000, 4000, 2, "openrouter")).toBe(3000);
+    expect(attemptTimeout(8000, 4000, 2)).toBe(2000);
     expect(attemptTimeout(8000, 8000, 1)).toBe(0);
     expect(attemptTimeout(8000, 9000, 1)).toBe(0);
     expect(attemptTimeout(8000, 0, 0)).toBe(0);

@@ -126,7 +126,7 @@ export function WebBookingForm({ today }: { today: string }) {
           <p className="text-sm text-destructive">{saveError}</p>
         ) : null}
         <Link
-          href={`/track?ref=${booked.ref}`}
+          href={`/book/track?ref=${booked.ref}`}
           className={buttonVariants({
             variant: "outline",
             className: "w-full",

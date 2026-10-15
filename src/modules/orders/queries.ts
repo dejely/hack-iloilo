@@ -20,7 +20,7 @@ import {
 export type Order = Database["public"]["Tables"]["rice_orders"]["Row"];
 export type { OrderStatus } from "./logic";
 
-/** A request joined with its buyer, for the Rice Buying list. */
+/** A request joined with its buyer, for the Buying list. */
 export type OrderListItem = Order & {
   client: {
     name: string;

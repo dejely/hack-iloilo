@@ -7,7 +7,7 @@ How we build the [PRD](PRD.md). Module numbers (M1–M10) match.
 - One Next.js app on Vercel, with Supabase for the database and auth. All free tiers.
 - One folder per module.
 - Clients use SMS through SMS Gateway for Android (SMSGate) on its cloud server, with a simulator for the demo.
-- AI (Gemini, with optional OpenRouter fallback) reads free-text SMS. It never computes numbers.
+- AI (OpenRouter first when configured, with Gemini fallback) reads free-text SMS. It never computes numbers.
 - The forecast is trained offline in Python. The app imports its output.
 - Single facility (IRPC) and crop (rice). Operations tables keep a `facility_id` for later.
 
@@ -104,8 +104,8 @@ interface SmsGateway {
 - On failure, fall back to the help text or an empty form.
 - A comma-separated `GOOGLE_GENERATIVE_AI_API_KEYS` pool overrides the legacy single key. Per-instance counters skip a key at 90% of configurable minute/day budgets (the local day is Asia/Manila); cold starts reset the counters. These are local estimates, not Google's remaining quota, and keys in the same Google project share limits.
 - A `429`/`RESOURCE_EXHAUSTED` response cools that Gemini key until its `retryDelay`, or the next minute/day window when absent.
-- Provider order: eligible Gemini key → OpenRouter (if configured) → another eligible Gemini key. OpenRouter also works without Gemini keys. Quota, server, timeout, billing and retryable network failures advance to the next option; schema and validation failures return `null` immediately. If all attempts fail, callers retain keyword help.
-- Inside the 8-second total budget, the first attempt reserves half for fallback. OpenRouter keeps up to one second for the final Gemini key; the final attempt gets all remaining time. With three timeouts and negligible overhead, this is 4 s + 3 s + 1 s. Log provider outcomes as `[ai:provider]` with safe failure categories, and key switches by index only; omit raw provider errors.
+- Provider order: OpenRouter (if configured) → eligible Gemini key → another eligible Gemini key. OpenRouter also works without Gemini keys. Quota, server, timeout, billing and retryable network failures advance to the next option; schema and validation failures return `null` immediately. If all attempts fail, callers retain keyword help.
+- Inside the 8-second total budget, each non-final attempt reserves half the remaining time for fallback; the final attempt gets all remaining time. With three timeouts and negligible overhead, this is 4 s + 2 s + 2 s. Log provider outcomes as `[ai:provider]` with safe failure categories, and key switches by index only; omit raw provider errors.
 - `OPENROUTER_MODEL` defaults to `openai/gpt-5.4-nano`, listed with structured-output support in OpenRouter's model catalog. This is a paid model; set a supported model matching the account's budget. Require compatible parameters when routing so the JSON schema is honored. Disable the provider's stricter all-fields-required mode to preserve optional Zod fields; `Output.object()` still validates every response before it can become a command. Cap OpenRouter output at 1,024 tokens for these short command objects so the provider does not reserve credits for its much larger default maximum.
 
 ## Data model
@@ -205,7 +205,7 @@ A short yes or no ("oo sige", "indi", "ok po") answers the sender's latest open 
 - `YES`, `NO`, `MOVE` and `CANCEL` only work from the client's phone or `booked_by_phone`. Others get the help reply.
 - `MOVE` keeps the ref, service and kg, confirms the new date right away, and drops a pending M10 proposal.
 - Staff use **Reschedule** on an open booking's list row to choose a date and flex days. The shared move operation rejects dates before Manila today and flex outside 0–7, updates both preferred and scheduled dates, and expires the old YES/NO prompt. Staff moves text the client and the original booker once each when their phones differ.
-- **Web tracking** (`/track`, public): ref plus the client's or booker's phone shows the booking and, once checked in, its place in line (same as `STATUS`). Accept/Decline, Move and Cancel call the same shared operations as `YES`/`NO`, `MOVE` and `CANCEL` and send the same texts; Accept/Decline also expires the SMS prompt. A wrong ref and someone else's booking both read "not found". Each miss is logged in `track_attempts`, and a phone with 5 misses in 15 minutes is locked out of `/track` until the window passes.
+- **Web tracking** (`/book/track`, public): ref plus the client's or booker's phone shows the booking and, once checked in, its place in line (same as `STATUS`). Accept/Decline, Move and Cancel call the same shared operations as `YES`/`NO`, `MOVE` and `CANCEL` and send the same texts; Accept/Decline also expires the SMS prompt. A wrong ref and someone else's booking both read "not found". Each miss is logged in `track_attempts`, and a phone with 5 misses in 15 minutes is locked out of `/book/track` until the window passes.
 
 ```mermaid
 stateDiagram-v2
@@ -363,9 +363,9 @@ Code lives in `src/modules/orders`. See [decision 0003](docs/decisions/0003-buye
 
 **Exports:** `createOrder(input)`, `trackedOrder(ref, phone)`, `cancelOrder(order)`, `listOrders(status?)`, `orderStock()`.
 
-**Flow:** `/buy` → `requestRiceOnline` registers or finds the buyer (`kind: buyer`, with their `buyer_type`) and texts the code. The manager accepts or declines on `/rice-buying`; staff cancel, or record the pickup: `pickUpOrder` calls M6 `dispatch()` from a batch in `riceBatchesForSale()` and saves its id as `rice_orders.dispatch_id`. `/buy/track` (code + phone) shows the status and cancels while `requested` or `accepted`; failed lookups share M4's `track_attempts` lock. Requests are limited to 3 per phone and 10 per IP an hour (`request_attempts`). Every change texts the buyer.
+**Flow:** `/buy` → `requestRiceOnline` registers or finds the buyer (`kind: buyer`, with their `buyer_type`) and texts the code. The manager accepts or declines on `/buying`; staff cancel, or record the pickup: `pickUpOrder` calls M6 `dispatch()` from a batch in `riceBatchesForSale()` and saves its id as `rice_orders.dispatch_id`. `/buy/track` (code + phone) shows the status and cancels while `requested` or `accepted`; failed lookups share M4's `track_attempts` lock. Requests are limited to 3 per phone and 10 per IP an hour (`request_attempts`). Every change texts the buyer.
 
-**Price and stock:** the estimate is `kg × rice_minor_per_kg` (M7); the dispatch (M6) sets the real price. No payment and no stock lock: `/rice-buying` shows free kg = M6 `riceStock()` − accepted kg, and flags open requests above it.
+**Price and stock:** the estimate is `kg × rice_minor_per_kg` (M7); the dispatch (M6) sets the real price. No payment and no stock lock: `/buying` shows free kg = M6 `riceStock()` − accepted kg, and flags open requests above it.
 
 **Public trace:** M6 `publicBatchTrail(batchNo)` finds only IRPC-owned batches with a dispatch and reads only dates, variety and origin. `traceOrigin` shows the co-op, else "<municipality> farmers", never a person.
 

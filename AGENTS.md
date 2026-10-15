@@ -95,7 +95,7 @@ See `.env.example`. Validated in `src/lib/env.ts`.
 
 `env()` maps the renamed SMS credentials to `SMSGATE_USERNAME`, `SMSGATE_PASSWORD`, and `SMSGATE_SIGNING_KEY` for internal consumers. Configure the `SMS_GATEWAY_*` input names shown above.
 
-Gemini quotas are shared by keys from the same Google project. Set the request budgets to match the model and tier in AI Studio; these defaults are local budgets. Counters are per server instance and reset on cold starts. `extract()` tries an eligible Gemini key, OpenRouter if configured, then a different eligible Gemini key. Quota, server, timeout, billing and retryable network failures advance to the next option; schema and validation failures return `null`. Within the 8-second total budget, the first attempt reserves half for fallback; OpenRouter keeps up to one second for the final Gemini key. Log provider names and safe failure categories as `[ai:provider]`, and Gemini key switches by index as `[ai:key]`; keep credentials and raw errors out of logs.
+Gemini quotas are shared by keys from the same Google project. Set the request budgets to match the model and tier in AI Studio; these defaults are local budgets. Counters are per server instance and reset on cold starts. `extract()` tries OpenRouter if configured, then up to two different eligible Gemini keys. Quota, server, timeout, billing and retryable network failures advance to the next option; schema and validation failures return `null`. Within the 8-second total budget, each non-final attempt reserves half the remaining time for fallback. Log provider names and safe failure categories as `[ai:provider]`, and Gemini key switches by index as `[ai:key]`; keep credentials and raw errors out of logs.
 
 ## Code Conventions
 

@@ -55,7 +55,7 @@ import {
   statusTones,
 } from "../logic";
 
-/** Public /track: look up a booking by ref and phone, then check, move, cancel or answer a proposal. */
+/** Public /book/track: look up a booking by ref and phone, then check, move, cancel or answer a proposal. */
 export function TrackBooking({
   defaultRef,
   today,

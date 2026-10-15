@@ -2,7 +2,7 @@
 
 // M4. Booking: Future drying and milling slots. See TRD.md.
 // Server actions. Check the staff role first with requireRole(), except the
-// public /book and /track actions, which act only for the entered phone.
+// public /book and /book/track actions, which act only for the entered phone.
 
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
@@ -213,7 +213,7 @@ export async function cancelBookingByStaff(
   }
 }
 
-/** What /track shows: the booking without its client, plus the place in line once checked in. */
+/** What /book/track shows: the booking without its client, plus the place in line once checked in. */
 export type TrackedBooking = Pick<
   Booking,
   | "ref"
@@ -255,7 +255,7 @@ async function tracked(booking: Booking): Promise<TrackedBooking> {
 }
 
 /**
- * Runs a public /track request for its ref and normalized phone. `run` returns
+ * Runs a public /book/track request for its ref and normalized phone. `run` returns
  * the booking, an error message, or null when the ref is unknown or not the
  * phone's: both read "not found" and count toward the lock.
  */
@@ -289,7 +289,7 @@ async function trackRequest<T extends TrackLookupInput>(
   }
 }
 
-/** /track lookup, the web twin of checking a booking and `STATUS`. */
+/** /book/track lookup, the web twin of checking a booking and `STATUS`. */
 export async function trackBooking(input: unknown): Promise<TrackResult> {
   return trackRequest(
     trackLookupSchema,
@@ -299,7 +299,7 @@ export async function trackBooking(input: unknown): Promise<TrackResult> {
   );
 }
 
-/** /track twin of `CANCEL <ref>`: same rules, same text to the phone. */
+/** /book/track twin of `CANCEL <ref>`: same rules, same text to the phone. */
 export async function cancelTrackedBooking(
   input: unknown,
 ): Promise<TrackResult> {
@@ -323,7 +323,7 @@ export async function cancelTrackedBooking(
   );
 }
 
-/** /track twin of `MOVE <ref> <dd/mm> [+days]`: same rules and texts. */
+/** /book/track twin of `MOVE <ref> <dd/mm> [+days]`: same rules and texts. */
 export async function moveTrackedBooking(input: unknown): Promise<TrackResult> {
   return trackRequest(
     trackMoveSchema,
@@ -347,7 +347,7 @@ export async function moveTrackedBooking(input: unknown): Promise<TrackResult> {
 }
 
 /**
- * /track twin of `YES <ref>` / `NO <ref>` to a reschedule proposal. Closes the
+ * /book/track twin of `YES <ref>` / `NO <ref>` to a reschedule proposal. Closes the
  * SMS prompt so a late text answer is ignored.
  */
 export async function answerTrackedProposal(

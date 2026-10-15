@@ -409,7 +409,7 @@ export async function queueStatusBySms(
   return queueStatusReply(await clientQueuePositions(ctx.client.id));
 }
 
-/** The client's place in each line, as `STATUS` and /track report it. */
+/** The client's place in each line, as `STATUS` and /book/track report it. */
 export async function clientQueuePositions(
   clientId: string,
 ): Promise<QueuePosition[]> {

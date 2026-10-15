@@ -213,7 +213,7 @@ it("rejects a blank name, an invalid phone or a past date online without saving"
   expect(createBooking).not.toHaveBeenCalled();
 });
 
-describe("public /track actions", () => {
+describe("public /book/track actions", () => {
   const owner = { ref: "k7p-2qx", phone: "0917 123 4567" };
   const phone = "+639171234567";
   const clientPhone = "+639181234567";

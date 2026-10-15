@@ -97,15 +97,15 @@ describe("AI extraction key failover", () => {
     ["server", { statusCode: 500 }],
     ["timeout", { name: "TimeoutError" }],
     ["network", { name: "AI_APICallError", isRetryable: true }],
-  ])("falls from Gemini to OpenRouter after %s", async (kind, error) => {
+  ])("falls from OpenRouter to Gemini after %s", async (kind, error) => {
     vi.stubEnv("OPENROUTER_API_KEY", "router-test-key");
     sdk.generateText.mockRejectedValueOnce(error);
     const { extract } = await import("./ai");
     expect(await extract(schema, "farmer request")).toEqual(output);
     const calls = sdk.generateText.mock.calls.map(([args]) => args);
     expect(calls.map((args) => args.model.testKey)).toEqual([
-      "test-key-a",
       "router-test-key",
+      "test-key-a",
     ]);
     expect(calls[1]).toMatchObject({
       prompt: calls[0].prompt,
@@ -115,14 +115,14 @@ describe("AI extraction key failover", () => {
     });
     expect(console.warn).toHaveBeenCalledWith(
       "[ai:provider]",
-      "gemini",
+      "openrouter",
       "failed",
       kind,
     );
   });
 
   it.each([503, 402])(
-    "tries another Gemini key third when OpenRouter returns %s",
+    "tries another Gemini key third when the first Gemini key returns %s",
     async (statusCode) => {
       vi.stubEnv("OPENROUTER_API_KEY", "router-test-key");
       sdk.generateText
@@ -132,16 +132,18 @@ describe("AI extraction key failover", () => {
       expect(await extract(schema, "price")).toEqual(output);
       expect(
         sdk.generateText.mock.calls.map(([args]) => args.model.testKey),
-      ).toEqual(["test-key-a", "router-test-key", "test-key-b"]);
+      ).toEqual(["router-test-key", "test-key-a", "test-key-b"]);
     },
   );
 
-  it("keeps a successful Gemini request on Gemini", async () => {
+  it("keeps a successful OpenRouter request on OpenRouter", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "router-test-key");
     const { extract } = await import("./ai");
     expect(await extract(schema, "price")).toEqual(output);
     expect(sdk.generateText).toHaveBeenCalledTimes(1);
-    expect(sdk.generateText.mock.calls[0][0].model.testKey).toBe("test-key-a");
+    expect(sdk.generateText.mock.calls[0][0].model.testKey).toBe(
+      "router-test-key",
+    );
   });
 
   it("prefers the configured primary again after a transient failure uses the backup", async () => {
@@ -154,15 +156,20 @@ describe("AI extraction key failover", () => {
     expect(await extract(schema, "price")).toEqual(output);
     expect(
       sdk.generateText.mock.calls.map(([args]) => args.model.testKey),
-    ).toEqual(["test-key-a", "router-test-key", "test-key-b", "test-key-a"]);
+    ).toEqual([
+      "router-test-key",
+      "test-key-a",
+      "test-key-b",
+      "router-test-key",
+    ]);
   });
 
   it("gives OpenRouter the full budget when all Gemini keys are cooling down", async () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEYS", "test-key-a,test-key-b");
     vi.stubEnv("OPENROUTER_API_KEY", "router-test-key");
     sdk.generateText
+      .mockRejectedValueOnce({ statusCode: 503 })
       .mockRejectedValueOnce(exhausted)
-      .mockResolvedValueOnce({ output })
       .mockRejectedValueOnce(exhausted);
     const { extract } = await import("./ai");
     await extract(schema, "price");
@@ -187,11 +194,11 @@ describe("AI extraction key failover", () => {
     expect(await extract(schema, "price")).toBeNull();
     expect(Date.now() - start).toBe(8000);
     expect(sdk.generateText.mock.calls.map(([args]) => args.timeout)).toEqual([
-      4000, 3000, 1000,
+      4000, 2000, 2000,
     ]);
     expect(
       sdk.generateText.mock.calls.map(([args]) => args.model.testKey),
-    ).toEqual(["test-key-a", "router-test-key", "test-key-b"]);
+    ).toEqual(["router-test-key", "test-key-a", "test-key-b"]);
   });
 
   it.each([
@@ -207,7 +214,7 @@ describe("AI extraction key failover", () => {
     expect(sdk.generateText).toHaveBeenCalledTimes(1);
   });
 
-  it("does not fall from OpenRouter to Gemini after a schema failure", async () => {
+  it("does not try another Gemini key after a schema failure", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "router-test-key");
     sdk.generateText
       .mockRejectedValueOnce({ statusCode: 503 })

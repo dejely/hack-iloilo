@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Wordmark } from "@/components/brand";
+import { PublicHeader } from "@/components/public-header";
 import {
   Card,
   CardContent,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayManila } from "@/lib/dates";
+import { TrackBooking } from "@/modules/booking/components/track-booking";
 import { WebBookingForm } from "@/modules/booking/components/web-booking-form";
 
 export const metadata: Metadata = { title: "Book a slot" };
@@ -20,15 +21,26 @@ async function BookingFormLoader() {
   return <WebBookingForm today={todayManila()} />;
 }
 
-export default function BookPage() {
+/** Booking lookup; `ref` prefills the code from a shared link. */
+async function TrackLoader({
+  searchParams,
+}: {
+  searchParams: PageProps<"/book">["searchParams"];
+}) {
+  await connection();
+  const { ref } = await searchParams;
   return (
-    <main className="flex flex-1 flex-col items-center justify-start gap-6 p-4 sm:justify-center">
-      <div className="flex flex-col items-center gap-1">
-        <Wordmark className="h-8 w-auto text-primary" />
-        <p className="text-sm text-muted-foreground">
-          Iloilo Rice Processing Complex
-        </p>
-      </div>
+    <TrackBooking
+      defaultRef={typeof ref === "string" ? ref : ""}
+      today={todayManila()}
+    />
+  );
+}
+
+export default function BookPage({ searchParams }: PageProps<"/book">) {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-start gap-6 p-4">
+      <PublicHeader back="/" subtitle="Iloilo Rice Processing Complex" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Book drying or milling</CardTitle>
@@ -39,6 +51,19 @@ export default function BookPage() {
         <CardContent>
           <Suspense fallback={<Skeleton className="h-96" />}>
             <BookingFormLoader />
+          </Suspense>
+        </CardContent>
+      </Card>
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Track a booking</CardTitle>
+          <CardDescription>
+            Check your place in line, move or cancel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<Skeleton className="h-64" />}>
+            <TrackLoader searchParams={searchParams} />
           </Suspense>
         </CardContent>
       </Card>

@@ -104,7 +104,7 @@ export async function OrdersView({
           return (
             <Link
               key={f.label}
-              href={f.value ? `/rice-buying?status=${f.value}` : "/rice-buying"}
+              href={f.value ? `/buying?status=${f.value}` : "/buying"}
               className={cn(
                 badgeVariants({ variant: active ? "default" : "outline" }),
               )}

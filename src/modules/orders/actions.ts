@@ -104,7 +104,7 @@ export async function requestRiceOnline(
       pickupDate,
     });
     await notifyOrder(created, "recorded");
-    revalidatePath("/rice-buying");
+    revalidatePath("/buying");
     return { status: "created", order: buyerView(created) };
   } catch (error) {
     console.error("Unable to create rice order", error);
@@ -131,7 +131,7 @@ const TRACK_LOCKED = `Too many tries. Wait ${TRACK_WINDOW_MINUTES} minutes and t
 /**
  * Runs a public /buy/track request. `run` returns the order, an error message,
  * or null when the ref is unknown or not the phone's: both read "not found"
- * and count toward the same lock as /track.
+ * and count toward the same lock as /book/track.
  */
 async function trackRequest(
   input: unknown,
@@ -179,7 +179,7 @@ export async function cancelTrackedOrder(
   return trackRequest(input, "Unable to cancel the request", async (order) => {
     const cancelled = await cancelOrder(order);
     if (!cancelled) return "This request can no longer be cancelled.";
-    revalidatePath("/rice-buying");
+    revalidatePath("/buying");
     return cancelled;
   });
 }
@@ -193,7 +193,7 @@ export async function decideOrder(id: string, accept: boolean): Promise<void> {
     accept ? "accepted" : "declined",
   );
   if (order) await notifyOrder(order, accept ? "accepted" : "declined");
-  revalidatePath("/rice-buying");
+  revalidatePath("/buying");
 }
 
 export type PickupResult =
@@ -240,7 +240,7 @@ export async function pickUpOrder(
       message: "Unable to record the pickup. Please try again.",
     };
   }
-  revalidatePath("/rice-buying");
+  revalidatePath("/buying");
   revalidatePath("/batches");
   return { status: "ok" };
 }
@@ -254,5 +254,5 @@ export async function cancelOrderByStaff(id: string): Promise<void> {
     "cancelled",
   );
   if (order) await notifyOrder(order, "cancelled");
-  revalidatePath("/rice-buying");
+  revalidatePath("/buying");
 }

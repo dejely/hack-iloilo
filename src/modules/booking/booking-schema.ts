@@ -69,7 +69,7 @@ export const moveBookingSchema = cancelSmsSchema.extend({
 });
 export type MoveBookingInput = z.infer<typeof moveBookingSchema>;
 
-/** Public /track: the booking ref (spaces and dashes allowed) and the client's or booker's phone. */
+/** Public /book/track: the booking ref (spaces and dashes allowed) and the client's or booker's phone. */
 export const trackLookupSchema = z.object({
   ref: z
     .string()

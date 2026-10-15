@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Wordmark } from "@/components/brand";
+import { PublicHeader } from "@/components/public-header";
 import {
   Card,
   CardContent,
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Track a booking" };
 async function TrackLoader({
   searchParams,
 }: {
-  searchParams: PageProps<"/track">["searchParams"];
+  searchParams: PageProps<"/book/track">["searchParams"];
 }) {
   await connection();
   const { ref } = await searchParams;
@@ -30,10 +30,10 @@ async function TrackLoader({
   );
 }
 
-export default function TrackPage({ searchParams }: PageProps<"/track">) {
+export default function TrackPage({ searchParams }: PageProps<"/book/track">) {
   return (
     <main className="flex flex-1 flex-col items-center justify-start gap-6 p-4 sm:justify-center">
-      <Wordmark className="h-8 w-auto text-primary" />
+      <PublicHeader back="/book" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Track your booking</CardTitle>

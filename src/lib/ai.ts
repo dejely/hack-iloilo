@@ -80,12 +80,7 @@ export async function extract<T>(
   const system = `Extract the farmer's request from this SMS, which may be in Hiligaynon, Tagalog, English or a mix. Today is ${todayManila()}. Copy amounts exactly as stated, in the farmer's unit; never convert units or calculate. Leave out anything not stated.`;
   for (const [attempt, provider] of order.entries()) {
     const now = Date.now();
-    const timeout = attemptTimeout(
-      deadline,
-      now,
-      order.length - attempt,
-      provider,
-    );
+    const timeout = attemptTimeout(deadline, now, order.length - attempt);
     if (timeout === 0) return null;
     let index: number | null = null;
     let model: LanguageModel | undefined = pool.openRouter;

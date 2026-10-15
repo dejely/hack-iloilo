@@ -208,7 +208,7 @@ export function bookedByLabel(
   return `${namesByPhone.get(row.booked_by_phone) ?? row.booked_by_phone} · FOR`;
 }
 
-/** Ownership for SMS and /track: only the client or whoever booked for them. */
+/** Ownership for SMS and /book/track: only the client or whoever booked for them. */
 export const isClientOrBooker = (
   booking: Pick<Booking, "booked_by_phone">,
   clientPhone: string,
@@ -220,7 +220,7 @@ export function cleanRef(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-/** Failed /track lookups a phone may make per window before it is locked out. */
+/** Failed /book/track lookups a phone may make per window before it is locked out. */
 export const TRACK_MAX_FAILURES = 5;
 export const TRACK_WINDOW_MINUTES = 15;
 

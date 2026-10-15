@@ -94,7 +94,7 @@ export async function findByRef(ref: string): Promise<Booking | null> {
 }
 
 /**
- * A booking as /track shows it, only to its client or booker. Null when the
+ * A booking as /book/track shows it, only to its client or booker. Null when the
  * ref is unknown or the phone is not theirs, so the two look the same.
  */
 export async function trackedBooking(
@@ -112,7 +112,7 @@ export async function trackedBooking(
   return isClientOrBooker(booking, client.phone, phone) ? booking : null;
 }
 
-/** Too many failed /track tries for this phone in the current window. */
+/** Too many failed /book/track tries for this phone in the current window. */
 export async function trackLocked(phone: string): Promise<boolean> {
   const since = new Date(
     Date.now() - TRACK_WINDOW_MINUTES * 60_000,
@@ -199,7 +199,7 @@ export type ProposalResult =
 /**
  * Answers a pending M10 proposal: YES moves the booking to its proposed date,
  * NO keeps its date; both confirm it. Only the client or booker may. Shared by
- * SMS `YES`/`NO` and /track; the caller closes the prompt and sends texts.
+ * SMS `YES`/`NO` and /book/track; the caller closes the prompt and sends texts.
  */
 export async function answerProposal(
   ref: string,

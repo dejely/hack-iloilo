@@ -4,14 +4,14 @@ export type AiProvider = "gemini" | "openrouter";
 export type ProviderFailure =
   "quota" | "server" | "timeout" | "network" | "billing" | "invalid";
 
-/** Try another service before returning to Gemini's next eligible key. */
+/** Prefer OpenRouter, then try up to two eligible Gemini keys. */
 export function providerOrder(
   geminiKeys: number,
   openRouter: boolean,
 ): AiProvider[] {
   const order: AiProvider[] = [];
-  if (geminiKeys > 0) order.push("gemini");
   if (openRouter) order.push("openrouter");
+  if (geminiKeys > 0) order.push("gemini");
   if (geminiKeys > 1) order.push("gemini");
   return order;
 }
@@ -21,17 +21,11 @@ export function attemptTimeout(
   deadline: number,
   now: number,
   attemptsLeft: number,
-  provider: AiProvider = "gemini",
 ): number {
   const remaining = Math.max(0, deadline - now);
   if (attemptsLeft <= 0) return 0;
   if (attemptsLeft === 1) return remaining;
-  // Prefer the second service, retaining up to one second for the last key.
-  const reserve =
-    provider === "openrouter"
-      ? Math.min(1000, Math.ceil(remaining / 2))
-      : Math.ceil(remaining / 2);
-  return remaining - reserve;
+  return remaining - Math.ceil(remaining / 2);
 }
 
 export function providerFailure(error: unknown, now: number): ProviderFailure {
