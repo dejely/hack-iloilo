@@ -470,7 +470,7 @@ export async function bookBySms(
   ctx: CommandContext,
 ): Promise<string> {
   const preferredDate = parseDayMonth(input.dayMonth, todayManila());
-  if (!preferredDate) return helpText(commandUsages());
+  if (!preferredDate) return bookingSms.invalidDate;
   const client =
     ctx.forPhone && ctx.forPhone !== ctx.phone
       ? await findOrRegisterByPhone(ctx.forPhone)

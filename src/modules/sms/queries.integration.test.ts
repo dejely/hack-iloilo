@@ -20,6 +20,7 @@ describe.skipIf(process.env.RUN_SMS_DB_TESTS !== "1")(
   () => {
     const phone = `+639${String(randomInt(0, 1_000_000_000)).padStart(9, "0")}`;
     const other = `+639${String(randomInt(0, 1_000_000_000)).padStart(9, "0")}`;
+    const flood = `+639${String(randomInt(0, 1_000_000_000)).padStart(9, "0")}`;
     const lastReply = async (to = phone) =>
       (await smsThread(to)).filter((m) => m.direction === "outbound").at(-1);
 
@@ -47,7 +48,7 @@ describe.skipIf(process.env.RUN_SMS_DB_TESTS !== "1")(
     });
 
     afterAll(async () => {
-      for (const p of [phone, other]) {
+      for (const p of [phone, other, flood]) {
         await db().from("sms_messages").delete().eq("phone", p);
         await db().from("sms_prompts").delete().eq("phone", p);
         await db().from("clients").delete().eq("phone", p);
@@ -203,6 +204,74 @@ describe.skipIf(process.env.RUN_SMS_DB_TESTS !== "1")(
       expect(reply).not.toMatch(/sako/);
       await handleInbound({ phone, body: "ECHOTEST 4" });
       expect((await lastReply())?.body).toMatch(/^n=4 /);
+    });
+
+    describe("edge cases", () => {
+      beforeAll(() => {
+        registerCommand({
+          keywords: ["KEYTEST", "SUSI"],
+          usage: "KEYTEST <n>",
+          schema: z.object({ n: z.number().int() }),
+          parse: ([n]) => (/^\d+$/.test(n ?? "") ? { n: Number(n) } : null),
+          handle: async ({ n }) => `key=${n}`,
+        });
+      });
+
+      it("reads keywords with punctuation, aliases and odd characters", async () => {
+        await handleInbound({ phone, body: "#susi: 4." });
+        expect((await lastReply())?.body).toBe("key=4");
+        await handleInbound({ phone, body: "ＫＥＹＴＥＳＴ\u200B 5" });
+        expect((await lastReply())?.body).toBe("key=5");
+      });
+
+      it("gives a keyword-only command's usage for bad args", async () => {
+        await handleInbound({ phone, body: "KEYTEST lima" });
+        expect((await lastReply())?.body).toBe(
+          "IRPC: Pasensya, wala namon naintiendihan. Palihog i-text: KEYTEST <n>",
+        );
+      });
+
+      it("reads an AI command's bad args with AI", async () => {
+        extract.mockResolvedValueOnce({
+          intent: { command: "ECHOTEST", args: { n: 12 } },
+        });
+        await handleInbound({ phone, body: "ECHOTEST dose palihog" });
+        expect((await lastReply())?.body).toMatch(/gusto mo echo 12\?/);
+        await handleInbound({ phone, body: "no" });
+      });
+
+      it("answers help words and punctuation-only texts with help", async () => {
+        for (const body of ["tabang", "???", "🙂"]) {
+          await handleInbound({ phone, body });
+          expect((await lastReply())?.body).toMatch(
+            /Palihog i-text|Ukon i-text/,
+          );
+        }
+      });
+
+      it("doesn't send a wall of text to AI", async () => {
+        extract.mockClear();
+        await handleInbound({ phone, body: "palihog ".repeat(80) });
+        expect((await lastReply())?.body).toMatch(/malawig gid/);
+        expect(extract).not.toHaveBeenCalled();
+      });
+
+      it("warns once, then stops replying to a flood", async () => {
+        const rows = Array.from({ length: 60 }, (_, i) => ({
+          direction: "inbound" as const,
+          phone: flood,
+          body: `spam ${i}`,
+          status: "processed" as const,
+        }));
+        await db().from("sms_messages").insert(rows);
+        await handleInbound({ phone: flood, body: "PRICE" });
+        expect((await lastReply(flood))?.body).toMatch(/Damo na ang text/);
+        await handleInbound({ phone: flood, body: "PRICE" });
+        const replies = (await smsThread(flood)).filter(
+          (m) => m.direction === "outbound",
+        );
+        expect(replies).toHaveLength(1);
+      });
     });
 
     it("replies with help when AI reads nothing valid", async () => {

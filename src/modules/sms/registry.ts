@@ -18,8 +18,11 @@ export type Command<T, A = T> = {
   keywords: string[];
   /** Validates the parsed args; a failure gets the help reply. */
   schema: z.ZodType<T>;
-  /** Raw tokens after the keyword, `FOR <phone>` already stripped. */
-  parse: (args: string[]) => unknown;
+  /**
+   * Raw tokens after the keyword, `FOR <phone>` already stripped. `keyword` is
+   * the one matched, uppercased, for keywords that carry a value ("MILL").
+   */
+  parse: (args: string[], keyword: string) => unknown;
   /** Example for the help reply, e.g. `CANCEL K7P2QX`. Defaults to the keyword. */
   usage?: string;
   /** Returns the reply text. */
@@ -82,8 +85,10 @@ export function registerCommand<T, A = T>(command: Command<T, A>): void {
   }
 }
 
+/** A command by keyword; hyphens are ignored, so "PA-DRY" finds "PADRY". */
 export function findCommand(keyword: string): Command<unknown> | undefined {
-  return commands.get(keyword.toUpperCase());
+  const key = keyword.toUpperCase();
+  return commands.get(key) ?? commands.get(key.replace(/-/g, ""));
 }
 
 /** AI-readable commands, each once under its first keyword. */

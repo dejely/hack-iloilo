@@ -4,12 +4,16 @@ import {
   fillQuestion,
   fillTemplate,
   helpText,
+  inboundAllowance,
+  INBOUND_LIMIT,
   isGsm7,
+  isHelp,
   mergeFill,
   missingFields,
   omitFields,
   parseAnswer,
   parseDayMonth,
+  normalizeBody,
   parseInbound,
   SMS_MAX_CHARS,
 } from "./logic";
@@ -54,6 +58,66 @@ describe("parseInbound", () => {
   it("does not treat the keyword itself as FOR", () => {
     expect(parseInbound("FOR 09171234567").forPhone).toBeUndefined();
   });
+
+  it("strips punctuation around words", () => {
+    expect(parseInbound("#Book: dry, 500 20/10.")).toEqual({
+      keyword: "BOOK",
+      args: ["dry", "500", "20/10"],
+      forPhone: undefined,
+    });
+    expect(parseInbound("/price?").keyword).toBe("PRICE");
+    expect(parseInbound("BOOK dry 500 20/10 +2").args.at(-1)).toBe("+2");
+    expect(parseInbound("QUOTE 14%").args).toEqual(["14%"]);
+    expect(parseInbound("BOOK x for (+639171234567)").forPhone).toBe(
+      "+639171234567",
+    );
+  });
+
+  it("reads full-width and zero-width characters", () => {
+    expect(parseInbound("ＢＯＯＫ\u200B dry").keyword).toBe("BOOK");
+    expect(parseInbound("\uFEFFprice").keyword).toBe("PRICE");
+  });
+
+  it("gives punctuation-only and emoji-only texts an empty keyword", () => {
+    expect(parseInbound("???").keyword).toBe("");
+    expect(parseInbound("🙂").keyword).toBe("");
+  });
+});
+
+describe("normalizeBody", () => {
+  it("rewrites dashed and dated days as day/month", () => {
+    expect(normalizeBody("BOOK DRY 500 20-10")).toBe("BOOK DRY 500 20/10");
+    expect(normalizeBody("sa 20/10/2026")).toBe("sa 20/10");
+    expect(normalizeBody("sa 20.10.26")).toBe("sa 20/10");
+  });
+
+  it("keeps decimals, ranges and impossible days", () => {
+    expect(normalizeBody("QUOTE 14.5")).toBe("QUOTE 14.5");
+    expect(normalizeBody("1000-1200 kg")).toBe("1000-1200 kg");
+    expect(normalizeBody("40-10")).toBe("40-10");
+  });
+
+  it("reads thumbs as yes and no", () => {
+    expect(normalizeBody("👍")).toBe("YES");
+    expect(normalizeBody("👎🏽")).toBe("NO");
+  });
+});
+
+describe("isHelp", () => {
+  it("reads empty texts and help words", () => {
+    for (const word of ["", "HELP", "TABANG", "BULIG", "INFO"])
+      expect(isHelp(word)).toBe(true);
+    expect(isHelp("BOOK")).toBe(false);
+  });
+});
+
+describe("inboundAllowance", () => {
+  it("replies up to the limit, warns once, then goes silent", () => {
+    expect(inboundAllowance(1)).toBe("ok");
+    expect(inboundAllowance(INBOUND_LIMIT)).toBe("ok");
+    expect(inboundAllowance(INBOUND_LIMIT + 1)).toBe("warn");
+    expect(inboundAllowance(INBOUND_LIMIT + 2)).toBe("silent");
+  });
 });
 
 describe("parseAnswer", () => {
@@ -68,6 +132,13 @@ describe("parseAnswer", () => {
     for (const text of ["yes", "Oo sige", "huo!", "ok po", "Sige salamat"])
       expect(answer(text)).toEqual({ yes: true });
     for (const text of ["no", "Indi", "ayaw na lang", "hindi po"])
+      expect(answer(text)).toEqual({ yes: false });
+  });
+
+  it("reads punctuation, stretched words, texting spellings and thumbs", () => {
+    for (const text of ["YES!!!", "yesss", "Okiee", "k", "👍", "huooo po"])
+      expect(answer(text)).toEqual({ yes: true });
+    for (const text of ["NOOO", "nah", "inde", "👎", "Hindeee"])
       expect(answer(text)).toEqual({ yes: false });
   });
 
@@ -94,13 +165,18 @@ describe("parseDayMonth", () => {
     expect(parseDayMonth("15/10", today)).toBe("2026-10-15");
   });
 
-  it("rolls past dates into next year", () => {
-    expect(parseDayMonth("14/10", today)).toBe("2027-10-14");
+  it("rolls a date into next year within the horizon", () => {
     expect(parseDayMonth("05/01", today)).toBe("2027-01-05");
   });
 
+  it("rejects a date that already passed or is too far ahead", () => {
+    expect(parseDayMonth("14/10", today)).toBeNull();
+    expect(parseDayMonth("1/9", today)).toBeNull();
+  });
+
   it("finds the next leap day", () => {
-    expect(parseDayMonth("29/02", today)).toBe("2028-02-29");
+    expect(parseDayMonth("29/02", "2028-01-15")).toBe("2028-02-29");
+    expect(parseDayMonth("29/02", today)).toBeNull();
   });
 
   it("rejects impossible or malformed dates", () => {

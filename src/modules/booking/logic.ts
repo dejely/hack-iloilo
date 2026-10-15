@@ -44,18 +44,80 @@ export const bookingAsk: Record<string, string> = {
   service: "Pa-dry (DRY) ukon pa-galing (MILL)?",
 };
 
-const unitOf = (word: string): "kg" | "sacks" | undefined =>
-  /^(kgs?|kilos?)$/.test(word)
+/** Most kg one SMS booking or offer may name; more is a typo or a test. */
+export const MAX_SMS_KG = 200_000;
+
+// English, Hiligaynon and Tagalog, as texted: "pa-dry", "pagaling", "kiskis".
+const DRYING_WORDS = new Set(
+  "dry drying dryer bulad bilad uga tuyo".split(" "),
+);
+const MILLING_WORDS = new Set(
+  "mill milling miller galing giling kiskis kiskisan".split(" "),
+);
+
+/** Service words a booking text may start with instead of BOOK. */
+export const SERVICE_KEYWORDS = (
+  "DRY DRYING PADRY BULAD PABULAD IPABULAD PAUGA " +
+  "MILL MILLING GALING PAGALING PAGGALING IPAGALING GILING PAGILING " +
+  "PAGGILING KISKIS PAKISKIS"
+).split(" ");
+
+/** The service a word names: "DRY", "pa-galing", "ipabulad". */
+export function serviceOf(word: string): Service | undefined {
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  const stems = ["ipa", "pag", "pa", "i"]
+    .filter((prefix) => w.startsWith(prefix))
+    .map((prefix) => w.slice(prefix.length));
+  for (const stem of [w, ...stems]) {
+    if (DRYING_WORDS.has(stem)) return "drying";
+    if (MILLING_WORDS.has(stem)) return "milling";
+  }
+  return undefined;
+}
+
+type Unit = "kg" | "sacks" | "tons";
+const unitOf = (word: string): Unit | undefined =>
+  /^(kgs?|kilos?|kls?|kilograms?)$/.test(word)
     ? "kg"
-    : /^(sacks?|sako|sx)$/.test(word)
+    : /^(sacks?|sakos?|sx|bags?|kabans?|cavans?|cabans?)$/.test(word)
       ? "sacks"
-      : undefined;
+      : /^(tons?|tonnes?|tonelada|toneladas)$/.test(word)
+        ? "tons"
+        : undefined;
+
+/** Thousands with commas ("1,000") or plain digits, with an optional decimal. */
+const AMOUNT = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([a-z]*)$/;
+
+/**
+ * An amount at `tokens[i]` with its unit, as a suffix ("20sako") or the next
+ * word ("20 sako", "20 ka sako"). `used` counts the tokens it took.
+ */
+function readAmount(
+  tokens: readonly string[],
+  i: number,
+): { value: number; unit?: Unit; used: number } | null {
+  const match = AMOUNT.exec(tokens[i].toLowerCase());
+  if (!match) return null;
+  const value = Number(`${match[1].replace(/,/g, "")}.${match[2] ?? 0}`);
+  if (!(value > 0)) return null;
+  if (match[3]) {
+    const unit = unitOf(match[3]);
+    return unit ? { value, unit, used: 1 } : null;
+  }
+  const skip = tokens[i + 1]?.toLowerCase() === "ka" ? 1 : 0;
+  const unit = unitOf(tokens[i + 1 + skip]?.toLowerCase() ?? "");
+  return unit ? { value, unit, used: 2 + skip } : { value, used: 1 };
+}
+
+/** An amount in whole kg: code converts sacks and tons, never the AI. */
+export const toKg = (value: number, unit: Unit = "kg"): number =>
+  Math.round(value * { kg: 1, sacks: SACK_KG, tons: 1000 }[unit]);
 
 /**
  * Reads a plain follow-up reply to `bookingAsk` without AI: "1000" (kg, as
- * asked), "20 sako", "20/10", "dry". A number is an amount only with a unit
- * or as the whole reply, so "sa Oct 20" isn't 20 kg. Null when nothing is
- * recognised.
+ * asked), "20 sako", "2 tons", "20/10", "pa-galing". A number is an amount
+ * only with a unit or as the whole reply, so "sa Oct 20" isn't 20 kg. Null
+ * when nothing is recognised.
  */
 export function readBookingReply(text: string): {
   amount?: number;
@@ -63,33 +125,32 @@ export function readBookingReply(text: string): {
   dayMonth?: string;
   service?: Service;
 } | null {
-  const tokens = text.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const tokens = text
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9%]+$/g, ""))
+    .filter(Boolean);
   const read: NonNullable<ReturnType<typeof readBookingReply>> = {};
 
   const dayMonth = tokens.find((t) => /^\d{1,2}\/\d{1,2}$/.test(t));
   if (dayMonth) read.dayMonth = dayMonth;
 
   const unit = tokens.map(unitOf).find(Boolean);
-  let amount: { value: number; unit: "kg" | "sacks" } | undefined;
-  tokens.forEach((token, i) => {
-    const match = /^(\d[\d,]*(?:\.\d+)?)([a-z]*)$/.exec(token);
-    if (amount || !match || token === dayMonth) return;
-    const value = Number(match[1].replace(/,/g, ""));
-    // "20 sako" or "20 ka sako"
-    const next = tokens[i + 1] === "ka" ? tokens[i + 2] : tokens[i + 1];
-    const given = match[2] ? unitOf(match[2]) : unitOf(next ?? "");
-    if (value > 0 && (given || tokens.length === 1))
-      amount = { value, unit: given ?? "kg" };
-  });
-  if (amount) {
-    read.amount = amount.value;
-    read.unit = amount.unit;
-  } else if (unit) read.unit = unit;
+  for (let i = 0; i < tokens.length && read.amount === undefined; i++) {
+    if (tokens[i] === dayMonth) continue;
+    const amount = readAmount(tokens, i);
+    if (!amount || (!amount.unit && tokens.length > 1)) continue;
+    // Tons go back as kg; the reading only knows kg and sacks.
+    read.unit = amount.unit === "sacks" ? "sacks" : "kg";
+    read.amount =
+      amount.unit === "tons" ? toKg(amount.value, "tons") : amount.value;
+  }
+  if (read.amount === undefined && unit && unit !== "tons") read.unit = unit;
 
-  if (/\b(dry|drying|bulad|pauga)\b/.test(text.toLowerCase()))
-    read.service = "drying";
-  else if (/\b(mill|milling|galing|paggaling)\b/.test(text.toLowerCase()))
-    read.service = "milling";
+  // "dry kag mill" names both, so leave the service to ask.
+  const named = new Set(tokens.map(serviceOf).filter(Boolean));
+  if (named.size === 1) read.service = [...named][0];
 
   return Object.keys(read).length ? read : null;
 }
@@ -109,7 +170,7 @@ export function bookingFromAi<
 }: T): Omit<T, "amount" | "unit"> & { estKg: number } {
   return {
     ...rest,
-    estKg: Math.round(unit === "sacks" ? amount * SACK_KG : amount),
+    estKg: toKg(amount, unit),
   };
 }
 
@@ -334,7 +395,17 @@ export const bookingSms = {
     "IRPC: Indi husto ang petsa. Palihog i-text ang adlaw subong ukon sa masunod, sa day/month, pareho sang 25/10.",
 } as const;
 
-const FLEX_ARG = /^[±+]\d+$/;
+// "+2", "±2", "+-2", "+/-2", "+2days", "+2 adlaw" is split, so the number only.
+const FLEX_ARG = /^(?:[±+]|\+-|\+\/-)(\d+)(?:d|days?|adlaw)?$/i;
+
+/** A ref as texted: "k7p2qx", "K7P-2QX", or split as "K7P 2QX". */
+export function readRef(args: readonly string[]): string | null {
+  const candidates = [...args.map(cleanRef), cleanRef(args.join(""))];
+  return candidates.filter((t) => /^[A-Z0-9]{6}$/.test(t)).at(-1) ?? null;
+}
+
+// Words people add to a booking: "BOOK DRY 1000 kg sa 20/10 po".
+const BOOKING_FILLER = new Set("ka sa on at po palay ko ang".split(" "));
 
 /** Strict keyword arguments; invalid shapes are rejected by the SMS schema. */
 const weekdayDate = new Intl.DateTimeFormat("en-US", {
@@ -372,26 +443,45 @@ export function describeBookingRequest({
 }
 
 export function parseBookingArgs(args: string[]): unknown {
-  if (args.length < 3 || args.length > 4) return null;
-  const [service, kg, dayMonth, flex] = args;
-  if (!/^\d+$/.test(kg) || (flex !== undefined && !FLEX_ARG.test(flex)))
-    return null;
-  return {
-    service: { DRY: "drying", MILL: "milling" }[service.toUpperCase()],
-    estKg: Number(kg),
-    dayMonth,
-    flexDays: flex === undefined ? 0 : Number(flex.slice(1)),
-  };
+  // Each part is told apart by its shape, so any order reads.
+  let service: Service | undefined;
+  let estKg: number | undefined;
+  let dayMonth: string | undefined;
+  let flexDays: number | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i];
+    const named = serviceOf(token);
+    const flex = FLEX_ARG.exec(token);
+    const amount = readAmount(args, i);
+    if (named) {
+      if (service && service !== named) return null;
+      service = named;
+    } else if (/^\d{1,2}\/\d{1,2}$/.test(token)) {
+      if (dayMonth) return null;
+      dayMonth = token;
+    } else if (flex) {
+      if (flexDays !== undefined) return null;
+      flexDays = Number(flex[1]);
+    } else if (amount && estKg === undefined) {
+      // Kg are whole; "1.5 sako" or "2.5 tons" convert to whole kg.
+      if ((amount.unit ?? "kg") === "kg" && !Number.isInteger(amount.value))
+        return null;
+      estKg = toKg(amount.value, amount.unit);
+      i += amount.used - 1;
+    } else if (!BOOKING_FILLER.has(token.toLowerCase())) return null;
+  }
+  return { service, estKg, dayMonth, flexDays: flexDays ?? 0 };
 }
 
 /** `MOVE <ref> <dd/mm> [±<days>]`; without flex days the booking keeps its own. */
 export function parseMoveArgs(args: string[]): unknown {
   if (args.length < 2 || args.length > 3) return null;
   const [ref, dayMonth, flex] = args;
-  if (flex !== undefined && !FLEX_ARG.test(flex)) return null;
+  const flexMatch = flex === undefined ? null : FLEX_ARG.exec(flex);
+  if (flex !== undefined && !flexMatch) return null;
   return {
-    ref: ref.toUpperCase(),
+    ref: cleanRef(ref),
     dayMonth,
-    ...(flex !== undefined && { flexDays: Number(flex.slice(1)) }),
+    ...(flexMatch && { flexDays: Number(flexMatch[1]) }),
   };
 }

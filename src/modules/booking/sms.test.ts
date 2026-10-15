@@ -22,6 +22,43 @@ describe("booking SMS arguments", () => {
     expect(parse("DRY 5000 20/10 +3").data?.flexDays).toBe(3);
   });
 
+  it("reads aliases, units, filler words and any order", () => {
+    const booking = (text: string) => parse(text).data;
+    expect(booking("galing 1000 20/10")?.service).toBe("milling");
+    expect(booking("pa-galing 1000 20/10")?.service).toBe("milling");
+    expect(booking("pagiling 1000 20/10")?.service).toBe("milling");
+    expect(booking("kiskis 1000 20/10")?.service).toBe("milling");
+    expect(booking("bulad 1000 20/10")?.service).toBe("drying");
+    expect(booking("PA-DRY 1000 20/10")?.service).toBe("drying");
+    expect(booking("DRY 1,000 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 1000kg 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 1000 kilos 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 20 sako 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 20 ka sako 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 20sacks 20/10")?.estKg).toBe(1000);
+    expect(booking("DRY 10 kaban 20/10")?.estKg).toBe(500);
+    expect(booking("DRY 1.5 sako 20/10")?.estKg).toBe(75);
+    expect(booking("DRY 2 tons 20/10")?.estKg).toBe(2000);
+    expect(booking("20/10 1000 DRY")).toEqual(booking("DRY 1000 20/10"));
+    expect(booking("DRY 1000 kg sa 20/10 po")?.estKg).toBe(1000);
+    for (const flex of ["+2", "±2", "+-2", "+/-2", "+2days", "+2d"])
+      expect(booking(`DRY 1000 20/10 ${flex}`)?.flexDays).toBe(2);
+  });
+
+  it.each([
+    "DRY MILL 1000 20/10",
+    "DRY 1000 20/10 21/10",
+    "DRY 1000 500 20/10",
+    "DRY 1000 20/10 +2 +3",
+    "DRY 200001 20/10",
+    "DRY 5000 sako 20/10",
+    "DRY 1,00 20/10",
+    "DRY 20 baskets 20/10",
+    "DRY 0 sako 20/10",
+  ])("rejects ambiguous or absurd arguments: %s", (text) => {
+    expect(parse(text).success).toBe(false);
+  });
+
   it.each([
     "DRY 0 20/10",
     "DRY -1 20/10",

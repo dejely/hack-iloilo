@@ -17,11 +17,10 @@ import {
 import { priceOn } from "@/modules/pricing/queries";
 import {
   fillTemplate,
-  helpText,
   parseDayMonth,
   SMS_MAX_CHARS,
 } from "@/modules/sms/logic";
-import { commandUsages, type CommandContext } from "@/modules/sms/registry";
+import type { CommandContext } from "@/modules/sms/registry";
 import { send } from "@/modules/sms/queries";
 import {
   currentFacility,
@@ -367,7 +366,7 @@ export async function sellBySms(
   if (!variety)
     return fillTemplate(buyingSms.unknownVariety, { code: input.varietyCode });
   const harvestDate = parseDayMonth(input.dayMonth, todayManila());
-  if (!harvestDate) return helpText(commandUsages());
+  if (!harvestDate) return buyingSms.invalidDate;
 
   // FOR records the offer under another client; authority is never granted by it.
   const client =

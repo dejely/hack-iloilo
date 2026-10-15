@@ -165,6 +165,10 @@ Every table has `id` (UUID), `created_at` and `updated_at`.
 
 - Modules register commands from their `sms.ts`; `src/modules/sms/queries.ts` imports each one.
 - The first word is the keyword. A trailing `FOR <phone>` is stripped into `ctx.forPhone`.
+- `normalizeBody` cleans every text first: full-width and zero-width characters, smart quotes, 👍/👎 as YES/NO, `:`/`;` between words, and `20-10` or `20/10/2026` as `20/10`. Punctuation around words is dropped (`#Book:`, `yes!`); keywords ignore hyphens (`PA-DRY`). `parse(args, keyword)` gets the matched keyword, for keywords that carry a value (`MILL 1000 20/10`).
+- Keywords with args that don't parse go to AI when the command has `ai` and AI is up; otherwise the reply is that command's `usage`. Texts over `MAX_AI_CHARS` (480) get a "shorter, please" reply and never reach AI.
+- `parseDayMonth` takes the next occurrence within `MAX_DAYS_AHEAD` (180 days), so a day that just passed is refused instead of booked a year out. SMS amounts are capped at `MAX_SMS_KG` (200,000 kg).
+- Flood guard: a phone's 61st inbound text in 10 minutes gets one "please wait" reply; later ones are logged without a reply or AI call.
 - Commands with `ai: { description, summary? }` can be read from free text, logged `via_ai`. With a `summary`, the reply asks "you want to {summary}? Is that right?" (an `ai_confirm` prompt); without one (read-only), the command runs right away. AI is optional: with no key, an error or an 8 s timeout, the help reply lists each command's `usage` format.
 - A prompt handler throws `PromptRefusal(reply)` to refuse an answer (e.g. from the wrong phone); the prompt stays open.
 
@@ -190,9 +194,9 @@ sequenceDiagram
   S->>G: send(reply)
 ```
 
-A short yes or no ("oo sige", "indi", "ok po") answers the sender's latest open prompt; `YES <ref>` / `NO <ref>` picks one. Prompts expire after 24 hours.
+A short yes or no ("oo sige", "indi", "ok po", "yesss", "👍") answers the sender's latest open prompt; `YES <ref>` / `NO <ref>` picks one. Prompts expire after 24 hours. `HELP`, `TABANG`, `BULIG`, `INFO`, or a text of only punctuation or emoji, gets the help reply.
 
-**Tests:** keyword parsing, `FOR`, dd/mm dates; the relay's signature check and dedupe.
+**Tests:** keyword parsing, normalization, `FOR`, dd/mm dates, the flood guard; the relay's signature check and dedupe.
 
 ### M4. Booking
 
@@ -230,6 +234,8 @@ stateDiagram-v2
 
 Any command accepts `FOR <phone>`.
 
+`BOOK` parts are told apart by shape, so any order reads, with filler words (`ka`, `sa`, `po`) skipped. Aliases: `BOOKING`, `RESERBA`; a text may also start with the service (`MILL 1000 20/10`, `pa-galing …`). Service words: `DRY`, `bulad`, `pauga`, `tuyo` (drying); `MILL`, `galing`, `giling`, `kiskis` (milling), with `pa-`/`pag-`/`ipa-` prefixes. Amounts: `1,000`, `1000kg`, `20 sako`, `20 ka sako`, `10 kaban`, `2 tons` (code converts at `SACK_KG` and 1,000 kg/ton); plain kg must be whole. Flex: `+2`, `±2`, `+-2`, `+2days`. Refs may be typed with dashes, spaces or lowercase (`k7p-2qx`). `CANCEL` also reads `KANSELA`; `MOVE` reads `SAYLO`.
+
 ### M5. Selling
 
 Code lives in `src/modules/buying`; the staff page is `/selling` (`/buying` redirects).
@@ -257,7 +263,7 @@ Code lives in `src/modules/buying`; the staff page is `/selling` (`/buying` redi
 | Quote   | `QUOTE <mc>% [<kg>]`          | `QUOTE 23% 5000`        |
 | Sell    | `SELL <kg> <variety> <dd/mm>` | `SELL 3000 RC222 25/10` |
 
-`SELL` accepts `FOR <phone>`. Accepted offers feed M9. `decideOffer` texts the seller the decision.
+`SELL` accepts `FOR <phone>`. Kg may be `3,000`, `3000kg` or `3000 kg`; `QUOTE` takes `14,5` or `14 %`. Aliases: `PRESYO` (PRICE), `BALIGYA` (SELL). Accepted offers feed M9. `decideOffer` texts the seller the decision.
 
 **Tests:** IRPC's sample form (8,763 kg × ₱21 = ₱184,023), MC above and below 25%, and each deduction.
 

@@ -78,6 +78,18 @@ describe("parseQuoteArgs", () => {
     expect(parseQuoteArgs(["14.5%"])).toEqual({ mc: 14.5, kg: undefined });
   });
 
+  it("reads a decimal comma, a lone %, and kg with commas or units", () => {
+    expect(parseQuoteArgs(["14,5"])).toEqual({ mc: 14.5, kg: undefined });
+    expect(parseQuoteArgs(["14", "%", "1,000"])).toEqual({ mc: 14, kg: 1000 });
+    expect(parseQuoteArgs(["14%", "1000kg"])).toEqual({ mc: 14, kg: 1000 });
+    expect(parseQuoteArgs(["14%", "1000", "kg"])).toEqual({ mc: 14, kg: 1000 });
+  });
+
+  it("lets the schema reject an absurd kg", () => {
+    const parsed = parseQuoteArgs(["14%", "999999999"]);
+    expect(quoteSmsSchema.safeParse(parsed).success).toBe(false);
+  });
+
   it.each([
     [[]],
     [["23%", "5000", "extra"]],
@@ -109,6 +121,13 @@ describe("parseSellArgs", () => {
       varietyCode: "RC222",
       dayMonth: "25/10",
     });
+  });
+
+  it("reads kg with commas or a unit", () => {
+    const sell = { estKg: 3000, varietyCode: "RC222", dayMonth: "25/10" };
+    expect(parseSellArgs(["3,000", "rc222", "25/10"])).toEqual(sell);
+    expect(parseSellArgs(["3000kg", "RC222", "25/10"])).toEqual(sell);
+    expect(parseSellArgs(["3000", "kg", "RC222", "25/10"])).toEqual(sell);
   });
 
   it.each([

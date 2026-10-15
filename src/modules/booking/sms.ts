@@ -13,19 +13,30 @@ import {
   bookingAsk,
   bookingFromAi,
   cancelAsk,
-  cleanRef,
   describeBookingRequest,
   parseBookingArgs,
   parseMoveArgs,
   readBookingReply,
+  readRef,
+  SERVICE_KEYWORDS,
+  serviceOf,
 } from "./logic";
 import { answerReschedule, bookBySms, cancelBySms, moveBySms } from "./queries";
 
 registerCommand({
-  keywords: ["BOOK"],
+  // "MILL 1000 20/10" without BOOK: the keyword is the service.
+  keywords: [
+    "BOOK",
+    "BOOKING",
+    "PABOOK",
+    "RESERVE",
+    "RESERBA",
+    ...SERVICE_KEYWORDS,
+  ],
   usage: "BOOK DRY 1000 20/10 +2 (DRY or MILL, kg, day/month, flex days)",
   schema: bookingSmsSchema,
-  parse: parseBookingArgs,
+  parse: (args, keyword) =>
+    parseBookingArgs(serviceOf(keyword) ? [keyword, ...args] : args),
   handle: bookBySms,
   ai: {
     description:
@@ -42,27 +53,27 @@ registerCommand({
 });
 
 registerCommand({
-  keywords: ["CANCEL"],
+  keywords: ["CANCEL", "KANSELA", "KANSEL", "ICANCEL"],
   usage: "CANCEL <code>",
   schema: cancelSmsSchema,
-  parse: (args) => (args.length === 1 ? { ref: args[0].toUpperCase() } : null),
+  parse: (args) => {
+    const ref = readRef(args);
+    return ref ? { ref } : null;
+  },
   handle: cancelBySms,
   ai: {
     description: "Cancel a booking by its 6-character code.",
     summary: ({ ref }) => `i-cancel ang booking ${ref}`,
     ask: cancelAsk,
     readReply: (text) => {
-      const ref = text
-        .split(/\s+/)
-        .map(cleanRef)
-        .find((t) => /^[A-Z0-9]{6}$/.test(t));
+      const ref = readRef(text.split(/\s+/).filter(Boolean));
       return ref ? { ref } : null;
     },
   },
 });
 
 registerCommand({
-  keywords: ["MOVE"],
+  keywords: ["MOVE", "SAYLO", "ISAYLO", "RESCHED", "RESCHEDULE"],
   usage: "MOVE <code> <dd/mm> [+days]",
   schema: moveSmsSchema,
   parse: parseMoveArgs,

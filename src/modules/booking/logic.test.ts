@@ -17,7 +17,9 @@ import {
   groupBookings,
   parseMoveArgs,
   readBookingReply,
+  readRef,
   rescheduleAnswer,
+  serviceOf,
   validateMove,
   type BookingFilters,
 } from "./logic";
@@ -161,6 +163,30 @@ describe("canMove", () => {
     expect(canMove(booking, "+6391", "+6391")).toBe("ok");
     expect(canMove(booking, "+6391", "+6392")).toBe("ok");
     expect(canMove(booking, "+6391", "+6393")).toBe("forbidden");
+  });
+});
+
+describe("readRef", () => {
+  it("reads a ref typed with dashes, spaces or lowercase", () => {
+    expect(readRef(["k7p2qx"])).toBe("K7P2QX");
+    expect(readRef(["K7P-2QX"])).toBe("K7P2QX");
+    expect(readRef(["K7P", "2QX"])).toBe("K7P2QX");
+    expect(readRef(["booking", "K7P2QX"])).toBe("K7P2QX");
+  });
+
+  it("returns null without a 6-character ref", () => {
+    expect(readRef([])).toBeNull();
+    expect(readRef(["booking", "ko"])).toBeNull();
+  });
+});
+
+describe("serviceOf", () => {
+  it("reads English, Hiligaynon and Tagalog service words", () => {
+    for (const word of ["DRY", "drying", "pa-dry", "bulad", "pauga", "tuyo"])
+      expect(serviceOf(word)).toBe("drying");
+    for (const word of ["MILL", "galing", "pagaling", "paggiling", "kiskis"])
+      expect(serviceOf(word)).toBe("milling");
+    expect(serviceOf("palay")).toBeUndefined();
   });
 });
 
@@ -330,6 +356,22 @@ describe("readBookingReply", () => {
       unit: "kg",
       dayMonth: "20/10",
     });
+  });
+
+  it("reads aliases, tons, kaban and punctuation", () => {
+    expect(readBookingReply("pa-galing")).toEqual({ service: "milling" });
+    expect(readBookingReply("giling")).toEqual({ service: "milling" });
+    expect(readBookingReply("ipabulad ko")).toEqual({ service: "drying" });
+    expect(readBookingReply("2 tons")).toEqual({ amount: 2000, unit: "kg" });
+    expect(readBookingReply("10 kaban.")).toEqual({
+      amount: 10,
+      unit: "sacks",
+    });
+    expect(readBookingReply("1,000!")).toEqual({ amount: 1000, unit: "kg" });
+  });
+
+  it("leaves the service to ask when both are named", () => {
+    expect(readBookingReply("dry kag mill")).toBeNull();
   });
 
   it("takes a number as the amount only with a unit or on its own", () => {

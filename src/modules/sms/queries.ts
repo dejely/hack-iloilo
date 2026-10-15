@@ -19,10 +19,15 @@ import {
   fillQuestion,
   fillTemplate,
   helpText,
+  INBOUND_WINDOW_MINUTES,
+  inboundAllowance,
   isGsm7,
+  isHelp,
+  MAX_AI_CHARS,
   MAX_FILL_ASKS,
   mergeFill,
   missingFields,
+  normalizeBody,
   omitFields,
   parseAnswer,
   parseInbound,
@@ -144,6 +149,21 @@ export async function handleInbound({
   await processInbound(data.id);
 }
 
+/** Inbound texts from a phone (raw or normalized) in the flood window. */
+async function recentInboundCount(phones: string[]): Promise<number> {
+  const since = new Date(
+    Date.now() - INBOUND_WINDOW_MINUTES * 60_000,
+  ).toISOString();
+  const { count, error } = await db()
+    .from("sms_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("direction", "inbound")
+    .in("phone", [...new Set(phones)])
+    .gte("created_at", since);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** Routes a logged inbound text once and sends the reply. */
 export async function processInbound(id: string): Promise<void> {
   // Claim the row so retries and duplicate relays process it once.
@@ -167,10 +187,21 @@ export async function processInbound(id: string): Promise<void> {
     return;
   }
 
+  const allowance = inboundAllowance(
+    await recentInboundCount([message.phone, phone]),
+  );
+  if (allowance !== "ok") {
+    console.warn("[sms] over the inbound limit:", phone);
+    await update(id, { phone, parsed: toJson(parsed) });
+    if (allowance === "warn") await send(phone, smsReplies.slowDown);
+    return;
+  }
+
   let reply: string;
   try {
     const client = await findOrRegisterByPhone(phone);
-    const routed = await route(parsed, message.body, { phone, client });
+    const body = normalizeBody(message.body);
+    const routed = await route(parsed, body, { phone, client });
     reply = routed.reply;
     await update(id, {
       phone,
@@ -203,22 +234,29 @@ async function route(
 
   const command = findCommand(parsed.keyword);
   if (!command) {
-    if (!parsed.keyword || parsed.keyword === "HELP")
-      return { reply: help(aiEnabled()) };
+    if (isHelp(parsed.keyword)) return { reply: help(aiEnabled()) };
+    // A wall of text is not a request; it also keeps AI costs bounded.
+    if (body.length > MAX_AI_CHARS) return { reply: smsReplies.tooLong };
     const fill = await latestOpenFill(ctx.phone);
     if (fill) return continueFill(fill, body, ctx);
     return interpret(body, ctx);
   }
   // A keyword starts over, so a pending follow-up question no longer applies.
   await closePrompts(ctx.phone, ["ai_fill"]);
-  return { reply: await runKeyword(command, parsed, ctx) };
+  const reply = await runKeyword(command, parsed, ctx);
+  if (reply !== null) return { reply };
+  // A keyword with words AI can read, e.g. "BOOK dry 20 sako sa Lunes".
+  if (command.ai && aiEnabled() && body.length <= MAX_AI_CHARS)
+    return interpret(body, ctx);
+  return { reply: helpText([command.usage ?? parsed.keyword]) };
 }
 
+/** Runs a keyword command; null when its args don't parse. */
 async function runKeyword(
   command: Command<unknown>,
   parsed: ParsedInbound,
   ctx: CommandContext,
-): Promise<string> {
+): Promise<string | null> {
   let forPhone: string | undefined;
   if (parsed.forPhone) {
     const normalized = normalizePhone(parsed.forPhone);
@@ -228,12 +266,12 @@ async function runKeyword(
 
   let args: unknown;
   try {
-    args = command.parse(parsed.args);
+    args = command.parse(parsed.args, parsed.keyword);
   } catch {
-    return help();
+    return null;
   }
   const result = command.schema.safeParse(args);
-  if (!result.success) return help();
+  if (!result.success) return null;
   return command.handle(result.data, { ...ctx, forPhone });
 }
 

@@ -99,29 +99,46 @@ export function parseOfferForm(raw: Record<string, unknown>): ParseResult {
 // --- SMS command parsing (M5). Still pure; the registry validates with the
 // schema and the queries resolve the variety and harvest date server-side. ---
 
+/** Most kg one SMS quote or offer may name; more is a typo or a test. */
+export const MAX_SMS_KG = 200_000;
+
 /** `QUOTE <mc>% [<kg>]`. MC is a percentage (`numeric(4,1)`), kg is whole kg. */
 export const quoteSmsSchema = z.object({
   mc: z.number().positive().max(99.9),
-  kg: z.number().int().positive().optional(),
+  kg: z.number().int().positive().max(MAX_SMS_KG).optional(),
 });
+
+/** Whole kg as texted: "1000", "1,000", "1000kg"; null otherwise. */
+function readKg(token: string): number | null {
+  const match = /^(\d{1,3}(?:,\d{3})+|\d+)(kgs?|kilos?)?$/i.exec(token);
+  return match ? Number(match[1].replace(/,/g, "")) : null;
+}
+
+/** Args without a unit word after the kg ("1000 kg") or a lone "%". */
+const dropUnitWords = (args: string[]): string[] =>
+  args.filter(
+    (arg, i) =>
+      arg !== "%" &&
+      !(i > 0 && /^(kgs?|kilos?)$/i.test(arg) && readKg(args[i - 1]) !== null),
+  );
 export type QuoteSmsInput = z.infer<typeof quoteSmsSchema>;
 
 /** Tokens after `QUOTE`: `<mc>%` and an optional `<kg>`. The `%` is optional. */
 export function parseQuoteArgs(args: string[]): unknown {
-  if (args.length < 1 || args.length > 2) return null;
-  const [mcRaw, kgRaw] = args;
-  const mcToken = mcRaw.replace(/%$/, "");
+  const tokens = dropUnitWords(args);
+  if (tokens.length < 1 || tokens.length > 2) return null;
+  const [mcRaw, kgRaw] = tokens;
+  // "14%", "14", "14.5", or "14,5" with a decimal comma.
+  const mcToken = mcRaw.replace(/%$/, "").replace(/^(\d+),(\d)$/, "$1.$2");
   if (!/^\d+(\.\d+)?$/.test(mcToken)) return null;
-  if (kgRaw !== undefined && !/^\d+$/.test(kgRaw)) return null;
-  return {
-    mc: Number(mcToken),
-    kg: kgRaw === undefined ? undefined : Number(kgRaw),
-  };
+  const kg = kgRaw === undefined ? undefined : readKg(kgRaw);
+  if (kg === null) return null;
+  return { mc: Number(mcToken), kg };
 }
 
 /** `SELL <kg> <variety> <dd/mm>`. The variety code resolves to an id server-side. */
 export const sellSmsSchema = z.object({
-  estKg: z.number().int().positive(),
+  estKg: z.number().int().positive().max(MAX_SMS_KG),
   varietyCode: z.string().min(1),
   dayMonth: z.string().regex(/^\d{1,2}\/\d{1,2}$/),
 });
@@ -129,10 +146,12 @@ export type SellSmsInput = z.infer<typeof sellSmsSchema>;
 
 /** Tokens after `SELL`: `<kg> <variety> <dd/mm>`, in that order. */
 export function parseSellArgs(args: string[]): unknown {
-  if (args.length !== 3) return null;
-  const [kg, variety, dayMonth] = args;
-  if (!/^\d+$/.test(kg)) return null;
-  return { estKg: Number(kg), varietyCode: variety.toUpperCase(), dayMonth };
+  const tokens = dropUnitWords(args);
+  if (tokens.length !== 3) return null;
+  const [kgRaw, variety, dayMonth] = tokens;
+  const kg = readKg(kgRaw);
+  if (kg === null) return null;
+  return { estKg: kg, varietyCode: variety.toUpperCase(), dayMonth };
 }
 
 /** SMS replies in Hiligaynon, filled with `fillTemplate`. GSM-7. */
@@ -142,6 +161,8 @@ export const buyingSms = {
   /** `{total}` is `, 1,000 kg = PHP 21,000.00` or empty. */
   quote:
     "IRPC estimate sa {mc}% MC: {perKg}/kg{total}. Estimate lang ini; ang final nga presyo matalana pag-receive sang palay.",
+  invalidDate:
+    "IRPC: Indi husto ang petsa sang harvest. Palihog i-text ang adlaw subong ukon sa masunod, sa day/month, pareho sang 25/10.",
   unknownVariety:
     'IRPC: Wala namon nakilala ang variety "{code}". Palihog i-check ang code kag tilawi liwat. I-text ang VARIETIES para sa listahan.',
   offerRecorded:

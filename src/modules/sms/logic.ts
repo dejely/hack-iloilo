@@ -34,9 +34,49 @@ export type ParsedInbound = {
   forPhone?: string;
 };
 
+/** Longest text worth reading with AI (three SMS segments). */
+export const MAX_AI_CHARS = 480;
+
+/**
+ * Cleans what phones and people add to a text: full-width and styled
+ * characters, zero-width spaces, smart quotes, a thumbs up/down for yes/no,
+ * `:`/`;` between words, and dates as `20-10` or `20/10/2026` (to `20/10`).
+ */
+export function normalizeBody(body: string): string {
+  const text = body
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u{1F44D}[\u{1F3FB}-\u{1F3FF}]?/gu, " YES ")
+    .replace(/\u{1F44E}[\u{1F3FB}-\u{1F3FF}]?/gu, " NO ")
+    .replace(/[:;]/g, " ");
+  return text
+    .split(/(\s+)/)
+    .map((token) => toDayMonth(token) ?? token)
+    .join("")
+    .trim();
+}
+
+/** `20-10`, `20/10/26`, `20.10.2026` as `20/10`; null for anything else. */
+function toDayMonth(token: string): string | null {
+  // A dot needs a year, so a decimal like 14.5 stays a number.
+  const match =
+    /^(\d{1,2})-(\d{1,2})$/.exec(token) ??
+    /^(\d{1,2})[-/.](\d{1,2})[-/.](?:\d{2}|\d{4})$/.exec(token);
+  if (!match || Number(match[1]) > 31 || Number(match[2]) > 12) return null;
+  return `${match[1]}/${match[2]}`;
+}
+
+// Punctuation around a word: "Book:", "#PRICE", "yes!", "20/10."
+const EDGE_PUNCTUATION = /^[^\p{L}\p{N}±+-]+|[^\p{L}\p{N}%]+$/gu;
+
 /** Splits a text into keyword, args and an optional trailing `FOR <phone>`. */
 export function parseInbound(body: string): ParsedInbound {
-  const tokens = body.trim().split(/\s+/).filter(Boolean);
+  const tokens = normalizeBody(body)
+    .split(/\s+/)
+    .map((token) => token.replace(EDGE_PUNCTUATION, ""))
+    .filter(Boolean);
   const [first = "", ...rest] = tokens;
   let forPhone: string | undefined;
   if (rest.length >= 2 && rest.at(-2)!.toUpperCase() === "FOR") {
@@ -46,13 +86,30 @@ export function parseInbound(body: string): ParsedInbound {
   return { keyword: first.toUpperCase(), args: rest, forPhone };
 }
 
-// English, Hiligaynon and Tagalog.
+const HELP_WORDS = new Set("HELP TABANG BULIG INFO MENU".split(" "));
+
+/** An empty text or a plain ask for help ("tabang", "?"). */
+export const isHelp = (keyword: string): boolean =>
+  !keyword || HELP_WORDS.has(keyword);
+
+// English, Hiligaynon and Tagalog, with common texting spellings.
 const YES_WORDS = new Set(
-  "YES Y YEP YUP OK OKAY OKS SURE GO OO HUO HO OPO SIGE TAMA CORRECT".split(
-    " ",
-  ),
+  (
+    "YES Y YEP YUP YEAH YA OK OKAY OKS OKI OKIE K KK SURE GO CONFIRM " +
+    "CONFIRMED OO HUO HO OPO SIGE TAMA CORRECT PWEDE PUEDE AYOS GAME"
+  ).split(" "),
 );
-const NO_WORDS = new Set("NO N NOPE INDI HINDI DILI AYAW WALA MALI".split(" "));
+const NO_WORDS = new Set(
+  "NO N NOPE NAH INDI INDE HINDI HINDE DILI AYAW WALA MALI DECLINE".split(" "),
+);
+
+/** `word` and its stretched forms read back: "YESSS", "NOOO", "OOOO". */
+const answerWord = (word: string, words: Set<string>): boolean =>
+  [
+    word,
+    word.replace(/(.)\1+/g, "$1"),
+    word.replace(/(.)\1{2,}/g, "$1$1"),
+  ].some((w) => words.has(w));
 
 /** Words that can follow an answer, e.g. "oo sige salamat". */
 const MAX_ANSWER_WORDS = 4;
@@ -66,16 +123,20 @@ export function parseAnswer({
   args,
 }: ParsedInbound): { yes: boolean; ref?: string } | null {
   const word = keyword.replace(/[^A-Z]/g, "");
-  const yes = YES_WORDS.has(word);
-  if (!yes && !NO_WORDS.has(word)) return null;
+  const yes = answerWord(word, YES_WORDS);
+  if (!yes && !answerWord(word, NO_WORDS)) return null;
   if (args.length > MAX_ANSWER_WORDS - 1) return null;
   const ref = args.find((a) => /^[A-Z0-9]{6}$/i.test(a))?.toUpperCase();
   return { yes, ...(ref && { ref }) };
 }
 
+/** Furthest a texted day/month may be; beyond it, the day likely passed. */
+export const MAX_DAYS_AHEAD = 180;
+
 /**
  * `dd/mm` (or `d/m`) as the next occurrence on or after `today`, as `YYYY-MM-DD`.
- * Null when the day can never exist (e.g. `31/02`).
+ * Null when the day can't exist (e.g. `31/02`) or is over `MAX_DAYS_AHEAD`
+ * away, so yesterday's date isn't read as next year.
  */
 export function parseDayMonth(token: string, today: string): string | null {
   const match = /^(\d{1,2})\/(\d{1,2})$/.exec(token.trim());
@@ -89,7 +150,8 @@ export function parseDayMonth(token: string, today: string): string | null {
   for (let y = year; y <= year + 8; y++) {
     const date = `${y}-${pad(month)}-${pad(day)}`;
     if (!isRealDate(date)) continue;
-    if (date >= today) return date;
+    if (date >= today)
+      return date <= addDays(today, MAX_DAYS_AHEAD) ? date : null;
   }
   return null;
 }
@@ -130,7 +192,25 @@ export const smsReplies = {
   promptExpired:
     "IRPC: Pasensya, expired na ina nga pamangkot. Palihog text liwat.",
   alreadyAnswered: "IRPC: Nasabat mo na ina.",
+  tooLong:
+    'IRPC: Pasensya, malawig gid ang text mo. Palihog i-text sing mubo lang, pareho sang "pa-dry 20 ka sako sa Lunes".',
+  slowDown:
+    "IRPC: Damo na ang text halin sa number mo. Palihog hulat anay sang 10 minutos antes mag-text liwat.",
 } as const;
+
+/** Texts a phone may send per window before IRPC stops replying. */
+export const INBOUND_LIMIT = 60;
+export const INBOUND_WINDOW_MINUTES = 10;
+
+/**
+ * What to do with a phone's `count`th text in the window, this one included:
+ * reply as usual, warn once at the limit, then stay silent so a flood or an
+ * auto-reply loop can't run up SMS and AI costs.
+ */
+export function inboundAllowance(count: number): "ok" | "warn" | "silent" {
+  if (count <= INBOUND_LIMIT) return "ok";
+  return count === INBOUND_LIMIT + 1 ? "warn" : "silent";
+}
 
 /** Asks the sender to confirm what AI read, e.g. "i-cancel ang booking K7P2QX". */
 export function aiConfirmText(summary: string): string {

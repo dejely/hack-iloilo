@@ -12,7 +12,7 @@ import {
 import { priceBySms, quoteBySms, sellBySms, varietiesBySms } from "./queries";
 
 registerCommand({
-  keywords: ["PRICE"],
+  keywords: ["PRICE", "PRICES", "PRESYO", "PRESIO"],
   schema: z.object({}),
   // Trailing words are ignored ("PRICE today").
   parse: () => ({}),
@@ -21,13 +21,15 @@ registerCommand({
 
 registerCommand({
   keywords: ["QUOTE"],
+  usage: "QUOTE 14% 1000",
   schema: quoteSmsSchema,
   parse: parseQuoteArgs,
   handle: quoteBySms,
 });
 
 registerCommand({
-  keywords: ["SELL"],
+  keywords: ["SELL", "BALIGYA", "IBALIGYA"],
+  usage: "SELL 1000 RC222 25/10",
   schema: sellSmsSchema,
   parse: parseSellArgs,
   handle: sellBySms,

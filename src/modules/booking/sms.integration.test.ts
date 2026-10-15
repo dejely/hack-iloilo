@@ -3,6 +3,7 @@ import {
   afterAll,
   afterEach,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -14,6 +15,8 @@ vi.mock("@/modules/accounts/auth", () => ({ requireRole: vi.fn() }));
 // Never send real SMS, even if the developer's gateway configuration changes.
 const { gatewaySend } = vi.hoisted(() => ({ gatewaySend: vi.fn() }));
 vi.mock("@/lib/sms", () => ({ smsGateway: () => ({ send: gatewaySend }) }));
+// Keyword formats only: never call a real AI provider from a test.
+vi.mock("@/lib/ai", () => ({ aiEnabled: () => false, extract: vi.fn() }));
 import * as dates from "@/lib/dates";
 import { db } from "@/lib/supabase/admin";
 import { findClientByPhone } from "@/modules/accounts/queries";
@@ -58,7 +61,7 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       await inbound(body, phone);
       const reply = await lastReply(phone);
       expect(reply.body).toContain("Confirmed na ang booking");
-      const ref = /Ref ([A-Z0-9]{6})/.exec(reply.body)![1];
+      const ref = /Code ([A-Z0-9]{6})/.exec(reply.body)![1];
       return (await findByRef(ref))!;
     };
 
@@ -71,6 +74,10 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       gatewaySend.mockImplementation(async () => ({
         id: `test-${randomUUID()}`,
       }));
+    });
+    // The texts below use fixed days like 20/10; keep them in the future.
+    beforeEach(() => {
+      vi.spyOn(dates, "todayManila").mockReturnValue("2026-10-15");
     });
     afterEach(() => vi.restoreAllMocks());
     afterAll(async () => {
@@ -144,15 +151,58 @@ describe.skipIf(process.env.RUN_BOOKING_SMS_DB_TESTS !== "1")(
       for (const body of [
         "BOOK DRY 0 20/10",
         "BOOK DRY 1.5 20/10",
-        "BOOK DRY 1 31/02",
         "BOOK DRY 1 20/10 ±8",
-        "CANCEL ABC123 extra",
+        "BOOK DRY 999999 20/10",
+        "BOOK DRY MILL 1 20/10",
+        "CANCEL",
         "BOOK DRY 1 20/10 FOR invalid",
       ]) {
         await inbound(body);
         expect((await lastReply()).body).toContain("wala namon naintiendihan");
       }
+      // A bad keyword gets that command's format, not the whole list.
+      await inbound("BOOK DRY 0 20/10");
+      expect((await lastReply()).body).toMatch(/i-text: BOOK DRY [^;]*$/);
+      for (const day of ["31/02", "1/9"]) {
+        await inbound(`BOOK DRY 1 ${day}`);
+        expect((await lastReply()).body).toBe(bookingSms.invalidDate);
+      }
       expect(await count()).toBe(before);
+    });
+
+    it("books from aliases, units, punctuation and any order", async () => {
+      expect(await book("pa-galing 1,000kg 20-10")).toMatchObject({
+        service: "milling",
+        est_kg: 1000,
+      });
+      expect(await book("#Book: 20/10 20 ka sako kiskis.")).toMatchObject({
+        service: "milling",
+        est_kg: 1000,
+      });
+      expect(await book("RESERBA bulad 2 tons 20/10 +-2")).toMatchObject({
+        service: "drying",
+        est_kg: 2000,
+        flex_days: 2,
+      });
+    });
+
+    it("books from a text that starts with the service", async () => {
+      expect(await book("GALING 500 20/10")).toMatchObject({
+        service: "milling",
+        est_kg: 500,
+      });
+      expect(await book("pa-dry 10 sako 20/10")).toMatchObject({
+        service: "drying",
+        est_kg: 500,
+      });
+    });
+
+    it("reads a ref typed with a dash or space", async () => {
+      const { ref } = await book();
+      await inbound(`kansela ${ref.slice(0, 3)}-${ref.slice(3)}`);
+      expect((await lastReply()).body).toBe(
+        fillTemplate(bookingSms.cancelled, { ref }),
+      );
     });
 
     it("resolves dates against Manila today, including year rollover", async () => {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { normalizePhone } from "@/modules/accounts/logic";
-import { cleanRef, MAX_FLEX_DAYS, services } from "./logic";
+import { cleanRef, MAX_FLEX_DAYS, MAX_SMS_KG, services } from "./logic";
 
 /** Staff booking form. Past dates are checked on the server against Manila today. */
 export const bookingSchema = z.object({
@@ -35,8 +35,9 @@ export type WebBookingInput = z.infer<typeof webBookingSchema>;
 
 /** SMS date resolution belongs to the shared SMS core. */
 export const bookingSmsSchema = bookingSchema
-  .pick({ service: true, estKg: true, flexDays: true })
+  .pick({ service: true, flexDays: true })
   .extend({
+    estKg: bookingSchema.shape.estKg.max(MAX_SMS_KG),
     dayMonth: z
       .string()
       .regex(/^\d{1,2}\/\d{1,2}$/)
@@ -46,7 +47,11 @@ export type BookingSmsInput = z.infer<typeof bookingSmsSchema>;
 
 /** A free-text booking as AI reads it: the amount as stated, converted by `bookingFromAi`. */
 export const bookingAiSchema = bookingSmsSchema.omit({ estKg: true }).extend({
-  amount: z.number().positive().describe("The amount exactly as stated"),
+  amount: z
+    .number()
+    .positive()
+    .max(MAX_SMS_KG)
+    .describe("The amount exactly as stated"),
   unit: z
     .enum(["kg", "sacks"])
     .describe("The unit stated: kg, or sacks (sako)"),
