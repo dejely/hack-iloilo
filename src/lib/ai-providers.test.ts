@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { attemptTimeout, providerFailure, providerOrder } from "./ai-providers";
+import {
+  attemptTimeout,
+  providerFailure,
+  providerFailureDetails,
+  providerOrder,
+} from "./ai-providers";
 
 describe("AI provider selection", () => {
   it.each([
@@ -64,5 +69,34 @@ describe("AI provider failure classification", () => {
   it("treats arbitrary errors as terminal", () => {
     expect(providerFailure(new Error("banana"), 0)).toBe("invalid");
     expect(providerFailure(null, 0)).toBe("invalid");
+  });
+});
+
+describe("safe AI failure diagnostics", () => {
+  it("distinguishes a provider rejection from output validation without logging contents", () => {
+    expect(
+      providerFailureDetails({
+        name: "AI_APICallError",
+        statusCode: 401,
+        message: "secret",
+        responseBody: "private SMS",
+      }),
+    ).toEqual({ type: "AI_APICallError", statusCode: 401 });
+    expect(
+      providerFailureDetails({
+        name: "AI_NoObjectGeneratedError",
+        text: "private SMS",
+        cause: { message: "secret" },
+      }),
+    ).toEqual({ type: "AI_NoObjectGeneratedError" });
+  });
+  it("does not log unknown error names or invalid status values", () => {
+    expect(
+      providerFailureDetails({ name: "private SMS", statusCode: "secret" }),
+    ).toEqual({ type: "unknown" });
+    expect(providerFailureDetails(null)).toEqual({ type: "unknown" });
+    expect(providerFailureDetails({ statusCode: 999 })).toEqual({
+      type: "unknown",
+    });
   });
 });
