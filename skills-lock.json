@@ -13,6 +13,12 @@
       "skillPath": "skills/engineering/code-review/SKILL.md",
       "computedHash": "57cfd4ceb011f05e58a1a4f4cad3b2e03419d371f8990f4bcb32ff0d435a039f"
     },
+    "deploy-to-vercel": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/deploy-to-vercel/SKILL.md",
+      "computedHash": "d2b5bcc7c09fdb649129ffc7dd7b647ec1b155736974b974292675afd588cb39"
+    },
     "grill-with-docs": {
       "source": "mattpocock/skills",
       "sourceType": "github",
