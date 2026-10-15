@@ -59,3 +59,34 @@ export function providerFailure(error: unknown, now: number): ProviderFailure {
     return "network";
   return "invalid";
 }
+
+/** Safe diagnostic fields only; raw provider errors can contain keys and SMS text. */
+export function providerFailureDetails(error: unknown): {
+  type: string;
+  statusCode?: number;
+} {
+  if (!error || typeof error !== "object") return { type: "unknown" };
+  const failure = error as { name?: unknown; statusCode?: unknown };
+  const types = [
+    "AI_APICallError",
+    "AI_NoObjectGeneratedError",
+    "AI_NoOutputGeneratedError",
+    "AI_TypeValidationError",
+    "AI_JSONParseError",
+    "ZodError",
+    "TimeoutError",
+    "AbortError",
+  ];
+  return {
+    type:
+      typeof failure.name === "string" && types.includes(failure.name)
+        ? failure.name
+        : "unknown",
+    ...(typeof failure.statusCode === "number" &&
+    Number.isInteger(failure.statusCode) &&
+    failure.statusCode >= 100 &&
+    failure.statusCode <= 599
+      ? { statusCode: failure.statusCode }
+      : {}),
+  };
+}
