@@ -3,6 +3,9 @@
 -- Refs are fixed (6 characters, no 0/O/1/I). Clients come from 02_accounts.sql.
 -- `FOR` bookings are made by a co-op's phone on behalf of a member farmer.
 
+-- current_date is the session's date; the demo runs on Manila days.
+set time zone 'Asia/Manila';
+
 insert into public.bookings (
   facility_id, ref, service, client_id, booked_by_phone, channel,
   est_kg, preferred_date, flex_days, scheduled_date, proposed_date, status

@@ -10,6 +10,9 @@
 -- Fillers go to traders so farmers without bookings stay fill-idle recipients
 -- (every co-op already has an open booking, so none are).
 
+-- current_date is the session's date; the demo runs on Manila days.
+set time zone 'Asia/Manila';
+
 insert into public.bookings (
   facility_id, ref, service, client_id, booked_by_phone, channel,
   est_kg, preferred_date, flex_days, scheduled_date, status

@@ -14,6 +14,9 @@
 --   +639172000007  Rogelio Palmares BOOK, due today (G4TD7Z)
 --   +639173000001  Nonoy Trading    BOOK MILL (S8WE2K)
 
+-- current_date is the session's date; the demo runs on Manila days.
+set time zone 'Asia/Manila';
+
 with d as (select current_date as today)
 insert into public.sms_messages (direction, phone, body, status, created_at)
 select

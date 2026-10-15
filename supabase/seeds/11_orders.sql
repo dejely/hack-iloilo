@@ -2,6 +2,9 @@
 -- Facility f0000000-…-01. Buyers by fixed id (02_accounts*.sql); the phone is
 -- the buyer's own. Refs are fixed demo values. Pickup dates are relative.
 
+-- current_date is the session's date; the demo runs on Manila days.
+set time zone 'Asia/Manila';
+
 insert into public.rice_orders (
   facility_id, ref, client_id, booked_by_phone, kg, pickup_date, status
 )

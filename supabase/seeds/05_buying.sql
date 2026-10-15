@@ -2,6 +2,9 @@
 -- Facility f0000000-…-01. Clients by fixed id, varieties by code. Refs are fixed
 -- demo values matching ^[A-Z0-9]{6}$. Harvest dates are relative to current_date.
 
+-- current_date is the session's date; the demo runs on Manila days.
+set time zone 'Asia/Manila';
+
 insert into public.sell_offers (
   facility_id, ref, client_id, booked_by_phone, variety_id, est_kg, harvest_date, status
 )
