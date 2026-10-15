@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   aiConfirmText,
+  fillQuestion,
   fillTemplate,
   helpText,
   isGsm7,
+  mergeFill,
+  missingFields,
+  omitFields,
   parseAnswer,
   parseDayMonth,
   parseInbound,
@@ -152,5 +156,68 @@ describe("aiConfirmText", () => {
     expect(text).not.toMatch(/YES|NO/);
     expect(isGsm7(text)).toBe(true);
     expect(text.length).toBeLessThanOrEqual(160);
+  });
+});
+
+describe("missingFields", () => {
+  const issues = (...fields: string[]) => fields.map((f) => ({ path: [f] }));
+
+  it("lists each top-level field once", () => {
+    expect(
+      missingFields(
+        [...issues("amount", "unit"), { path: ["amount", 0] }],
+        ["amount", "unit", "dayMonth"],
+      ),
+    ).toEqual(["amount", "unit"]);
+  });
+
+  it("returns null when a field can't be asked for", () => {
+    expect(missingFields(issues("amount", "flexDays"), ["amount"])).toBeNull();
+  });
+
+  it("returns null for a root issue or no issues", () => {
+    expect(missingFields([{ path: [] }], ["amount"])).toBeNull();
+    expect(missingFields([], ["amount"])).toBeNull();
+  });
+});
+
+describe("mergeFill", () => {
+  it("takes only the missing fields the reply has", () => {
+    expect(
+      mergeFill(
+        { service: "drying", dayMonth: "20/10" },
+        { amount: 1000, unit: "kg", service: "milling", dayMonth: null },
+        ["amount", "unit", "dayMonth"],
+      ),
+    ).toEqual({
+      service: "drying",
+      dayMonth: "20/10",
+      amount: 1000,
+      unit: "kg",
+    });
+  });
+
+  it("keeps args unchanged without a reply", () => {
+    expect(mergeFill({ a: 1 }, null, ["b"])).toEqual({ a: 1 });
+  });
+});
+
+describe("omitFields", () => {
+  it("drops the given fields", () => {
+    expect(omitFields({ a: 1, b: -5, c: 3 }, ["b"])).toEqual({ a: 1, c: 3 });
+  });
+});
+
+describe("fillQuestion", () => {
+  const ask = { amount: "Pila ka kilo?", unit: "Pila ka kilo?", day: "San-o?" };
+
+  it("asks a shared question once", () => {
+    expect(fillQuestion(["amount", "unit"], ask)).toBe("IRPC: Pila ka kilo?");
+  });
+
+  it("joins different questions", () => {
+    expect(fillQuestion(["amount", "day"], ask)).toBe(
+      "IRPC: Pila ka kilo? San-o?",
+    );
   });
 });

@@ -1,13 +1,19 @@
 // Every outbound SMS text, filled with long values: GSM-7 and within one text.
 
 import { describe, expect, it } from "vitest";
-import { bookingSms, describeBookingRequest } from "@/modules/booking/logic";
+import {
+  bookingAsk,
+  bookingSms,
+  cancelAsk,
+  describeBookingRequest,
+} from "@/modules/booking/logic";
 import { buyingSms, formatVarietiesSms } from "@/modules/buying/logic";
 import { NOT_IN_LINE_REPLY, queueStatusReply } from "@/modules/gate/logic";
 import { orderSms } from "@/modules/orders/logic";
 import { idleDraft } from "@/modules/prescriptions/logic";
 import {
   aiConfirmText,
+  fillQuestion,
   fillTemplate,
   helpText,
   isGsm7,
@@ -67,6 +73,8 @@ const texts: [string, string][] = [
       }),
     ),
   ],
+  ["booking questions", fillQuestion(Object.keys(bookingAsk), bookingAsk)],
+  ["cancel question", fillQuestion(Object.keys(cancelAsk), cancelAsk)],
   ["not in line", NOT_IN_LINE_REPLY],
   [
     "queue",

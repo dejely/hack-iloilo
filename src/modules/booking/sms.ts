@@ -10,10 +10,14 @@ import {
   moveSmsSchema,
 } from "./booking-schema";
 import {
+  bookingAsk,
   bookingFromAi,
+  cancelAsk,
+  cleanRef,
   describeBookingRequest,
   parseBookingArgs,
   parseMoveArgs,
+  readBookingReply,
 } from "./logic";
 import { answerReschedule, bookBySms, cancelBySms, moveBySms } from "./queries";
 
@@ -32,6 +36,8 @@ registerCommand({
         ...cmd,
         date: parseDayMonth(cmd.dayMonth, todayManila()),
       }),
+    ask: bookingAsk,
+    readReply: readBookingReply,
   },
 });
 
@@ -44,6 +50,14 @@ registerCommand({
   ai: {
     description: "Cancel a booking by its 6-character code.",
     summary: ({ ref }) => `i-cancel ang booking ${ref}`,
+    ask: cancelAsk,
+    readReply: (text) => {
+      const ref = text
+        .split(/\s+/)
+        .map(cleanRef)
+        .find((t) => /^[A-Z0-9]{6}$/.test(t));
+      return ref ? { ref } : null;
+    },
   },
 });
 

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const extract = vi.hoisted(() => vi.fn(async (): Promise<unknown> => null));
-vi.mock("@/lib/ai", () => ({ extract, aiEnabled: () => true }));
+const aiEnabled = vi.hoisted(() => vi.fn(() => true));
+vi.mock("@/lib/ai", () => ({ extract, aiEnabled }));
 import { db } from "@/lib/supabase/admin";
 import {
   handleInbound,
@@ -213,6 +214,139 @@ describe.skipIf(process.env.RUN_SMS_DB_TESTS !== "1")(
       });
       await handleInbound({ phone, body: "echo x" });
       expect((await lastReply())?.body).toMatch(/wala namon naintiendihan/);
+    });
+
+    describe("asking for missing values", () => {
+      const fillStatus = async () => {
+        const { data } = await db()
+          .from("sms_prompts")
+          .select("status")
+          .eq("phone", phone)
+          .eq("kind", "ai_fill")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        return data?.status;
+      };
+      const askForN = async () => {
+        extract.mockResolvedValueOnce({
+          intent: { command: "FILLTEST", args: { label: "x" } },
+        });
+        await handleInbound({ phone, body: "fill x please" });
+        expect((await lastReply())?.body).toBe("IRPC: Pila?");
+      };
+
+      beforeAll(() => {
+        registerCommand({
+          keywords: ["FILLTEST"],
+          schema: z.object({ label: z.string(), n: z.number().int() }),
+          parse: () => null,
+          handle: async ({ label, n }) => `filled ${label}=${n}`,
+          ai: {
+            description: "Fill a number.",
+            summary: ({ label, n }) => `fill ${label}=${n}`,
+            ask: { n: "Pila?" },
+            readReply: (text) =>
+              /^\d+$/.test(text.trim()) ? { n: Number(text) } : null,
+          },
+        });
+      });
+
+      it("asks, then confirms once the value comes in", async () => {
+        await askForN();
+        await handleInbound({ phone, body: "5" });
+        expect((await lastReply())?.body).toBe(
+          "IRPC: Para sigurado, gusto mo fill x=5? Husto bala?",
+        );
+        expect(await fillStatus()).toBe("accepted");
+        await handleInbound({ phone, body: "yes" });
+        expect((await lastReply())?.body).toBe("filled x=5");
+      });
+
+      it("reads a reply with AI when code can't", async () => {
+        await askForN();
+        extract.mockResolvedValueOnce({ n: 6 });
+        await handleInbound({ phone, body: "unom" });
+        expect((await lastReply())?.body).toMatch(/fill x=6/);
+        await handleInbound({ phone, body: "no" });
+      });
+
+      it("asks again, then gives up with help", async () => {
+        await askForN();
+        await handleInbound({ phone, body: "ambot" });
+        expect((await lastReply())?.body).toBe("IRPC: Pila?");
+        await handleInbound({ phone, body: "ambot gid" });
+        expect((await lastReply())?.body).toMatch(/wala namon naintiendihan/);
+        expect(await fillStatus()).toBe("expired");
+      });
+
+      it("is cancelled by a keyword command", async () => {
+        await askForN();
+        await handleInbound({ phone, body: "ECHOTEST 9" });
+        expect((await lastReply())?.body).toMatch(/^n=9 /);
+        expect(await fillStatus()).toBe("expired");
+      });
+
+      it("is dropped on a no and not answered later", async () => {
+        await askForN();
+        await handleInbound({ phone, body: "indi" });
+        expect((await lastReply())?.body).toBe(
+          "IRPC: Sige, wala kami gin-save.",
+        );
+        expect(await fillStatus()).toBe("declined");
+        await handleInbound({ phone, body: "5" });
+        expect((await lastReply())?.body).toMatch(/wala namon naintiendihan/);
+      });
+
+      it("leaves a plain yes to other prompts", async () => {
+        await askForN();
+        await handleInbound({ phone, body: "yes" });
+        expect((await lastReply())?.body).toMatch(/Wala kami pamangkot/);
+        expect(await fillStatus()).toBe("open");
+        await handleInbound({ phone, body: "5" });
+        expect((await lastReply())?.body).toMatch(/fill x=5/);
+        await handleInbound({ phone, body: "no" });
+      });
+
+      it("supersedes an unanswered AI confirmation", async () => {
+        extract.mockResolvedValueOnce({
+          intent: { command: "ECHOTEST", args: { n: 4 } },
+        });
+        await handleInbound({ phone, body: "echo four" });
+        expect((await lastReply())?.body).toMatch(/Husto bala/);
+        await askForN();
+        await handleInbound({ phone, body: "yes" });
+        expect((await lastReply())?.body).toMatch(/Wala kami pamangkot/);
+        await handleInbound({ phone, body: "no" });
+      });
+
+      it("takes a reply with no missing value as a new request", async () => {
+        await askForN();
+        extract
+          .mockResolvedValueOnce({})
+          .mockResolvedValueOnce({ intent: { command: "NONE" } });
+        await handleInbound({ phone, body: "Pila presyo subong?" });
+        expect((await lastReply())?.body).toMatch(/wala namon naintiendihan/);
+        expect(await fillStatus()).toBe("expired");
+      });
+
+      it("is not answered once expired", async () => {
+        await askForN();
+        await db()
+          .from("sms_prompts")
+          .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+          .eq("phone", phone)
+          .eq("kind", "ai_fill")
+          .eq("status", "open");
+        await handleInbound({ phone, body: "5" });
+        expect((await lastReply())?.body).toMatch(/wala namon naintiendihan/);
+      });
+
+      it("never asks with AI off", async () => {
+        aiEnabled.mockReturnValueOnce(false);
+        await handleInbound({ phone, body: "fill x please" });
+        expect((await lastReply())?.body).toMatch(/Palihog i-text: /);
+      });
     });
 
     it("expires prompts after 24 hours", async () => {

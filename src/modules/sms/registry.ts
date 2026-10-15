@@ -39,6 +39,14 @@ export type Command<T, A = T> = {
      * K7P2QX". Omit for read-only commands, which run right away.
      */
     summary?: (cmd: T) => string;
+    /**
+     * Questions for values the sender may leave out, keyed by field of the AI
+     * reading (`input.schema`, else `schema`). Those fields are optional for
+     * the AI and asked for in a follow-up text; a shared question asks once.
+     */
+    ask?: Record<string, string>;
+    /** Reads a follow-up reply without AI, e.g. "1000" as kg; null when unclear. */
+    readReply?: (text: string) => Record<string, unknown> | null;
   };
 };
 

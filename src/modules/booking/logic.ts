@@ -36,6 +36,69 @@ export const MAX_FLEX_DAYS = 7;
 // TODO(M3): confirm IRPC's sack weight.
 export const SACK_KG = 50;
 
+/** Follow-up questions for a free-text booking missing these values. GSM-7. */
+export const bookingAsk: Record<string, string> = {
+  amount: "Pila ka kilo (ukon sako) ang palay mo?",
+  unit: "Pila ka kilo (ukon sako) ang palay mo?",
+  dayMonth: "San-o ka maabot? I-text ang adlaw/bulan, pareho sang 20/10.",
+  service: "Pa-dry (DRY) ukon pa-galing (MILL)?",
+};
+
+const unitOf = (word: string): "kg" | "sacks" | undefined =>
+  /^(kgs?|kilos?)$/.test(word)
+    ? "kg"
+    : /^(sacks?|sako|sx)$/.test(word)
+      ? "sacks"
+      : undefined;
+
+/**
+ * Reads a plain follow-up reply to `bookingAsk` without AI: "1000" (kg, as
+ * asked), "20 sako", "20/10", "dry". A number is an amount only with a unit
+ * or as the whole reply, so "sa Oct 20" isn't 20 kg. Null when nothing is
+ * recognised.
+ */
+export function readBookingReply(text: string): {
+  amount?: number;
+  unit?: "kg" | "sacks";
+  dayMonth?: string;
+  service?: Service;
+} | null {
+  const tokens = text.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const read: NonNullable<ReturnType<typeof readBookingReply>> = {};
+
+  const dayMonth = tokens.find((t) => /^\d{1,2}\/\d{1,2}$/.test(t));
+  if (dayMonth) read.dayMonth = dayMonth;
+
+  const unit = tokens.map(unitOf).find(Boolean);
+  let amount: { value: number; unit: "kg" | "sacks" } | undefined;
+  tokens.forEach((token, i) => {
+    const match = /^(\d[\d,]*(?:\.\d+)?)([a-z]*)$/.exec(token);
+    if (amount || !match || token === dayMonth) return;
+    const value = Number(match[1].replace(/,/g, ""));
+    // "20 sako" or "20 ka sako"
+    const next = tokens[i + 1] === "ka" ? tokens[i + 2] : tokens[i + 1];
+    const given = match[2] ? unitOf(match[2]) : unitOf(next ?? "");
+    if (value > 0 && (given || tokens.length === 1))
+      amount = { value, unit: given ?? "kg" };
+  });
+  if (amount) {
+    read.amount = amount.value;
+    read.unit = amount.unit;
+  } else if (unit) read.unit = unit;
+
+  if (/\b(dry|drying|bulad|pauga)\b/.test(text.toLowerCase()))
+    read.service = "drying";
+  else if (/\b(mill|milling|galing|paggaling)\b/.test(text.toLowerCase()))
+    read.service = "milling";
+
+  return Object.keys(read).length ? read : null;
+}
+
+/** Follow-up question for a free-text cancel without a ref. GSM-7. */
+export const cancelAsk: Record<string, string> = {
+  ref: "Ano ang 6-letra nga ref sang booking? Pareho sang K7P2QX.",
+};
+
 /** An AI-read booking amount in kg: code converts sacks, never the AI. */
 export function bookingFromAi<
   T extends { amount: number; unit: "kg" | "sacks" },

@@ -16,6 +16,7 @@ import {
   formatShortDate,
   groupBookings,
   parseMoveArgs,
+  readBookingReply,
   rescheduleAnswer,
   validateMove,
   type BookingFilters,
@@ -301,5 +302,52 @@ describe("/track helpers", () => {
   it("locks a phone at the failure limit", () => {
     expect(isTrackLocked(TRACK_MAX_FAILURES - 1)).toBe(false);
     expect(isTrackLocked(TRACK_MAX_FAILURES)).toBe(true);
+  });
+});
+
+describe("readBookingReply", () => {
+  it("reads a bare number as kg, as asked", () => {
+    expect(readBookingReply("1000")).toEqual({ amount: 1000, unit: "kg" });
+    expect(readBookingReply("1,000 kilos")).toEqual({
+      amount: 1000,
+      unit: "kg",
+    });
+    expect(readBookingReply("1000kg")).toEqual({ amount: 1000, unit: "kg" });
+  });
+
+  it("reads sacks", () => {
+    expect(readBookingReply("20 ka sako")).toEqual({
+      amount: 20,
+      unit: "sacks",
+    });
+    expect(readBookingReply("sako")).toEqual({ unit: "sacks" });
+  });
+
+  it("reads a day/month without taking it as the amount", () => {
+    expect(readBookingReply("20/10")).toEqual({ dayMonth: "20/10" });
+    expect(readBookingReply("500 kg sa 20/10")).toEqual({
+      amount: 500,
+      unit: "kg",
+      dayMonth: "20/10",
+    });
+  });
+
+  it("takes a number as the amount only with a unit or on its own", () => {
+    expect(readBookingReply("sa Oct 20")).toBeNull();
+    expect(readBookingReply("Lunes 20")).toBeNull();
+    expect(readBookingReply("1000 kg sa Lunes")).toEqual({
+      amount: 1000,
+      unit: "kg",
+    });
+  });
+
+  it("reads the service", () => {
+    expect(readBookingReply("pa-dry")).toEqual({ service: "drying" });
+    expect(readBookingReply("galing")).toEqual({ service: "milling" });
+  });
+
+  it("returns null when nothing is recognised", () => {
+    expect(readBookingReply("wala ko kabalo")).toBeNull();
+    expect(readBookingReply("0")).toBeNull();
   });
 });

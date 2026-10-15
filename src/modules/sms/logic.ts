@@ -137,6 +137,55 @@ export function aiConfirmText(summary: string): string {
   return `IRPC: Para sigurado, gusto mo ${summary}? Husto bala?`;
 }
 
+/** Follow-up questions per AI-read text before falling back to help. */
+export const MAX_FILL_ASKS = 2;
+
+/**
+ * Top-level fields named by validation issues, once each. Null when any of
+ * them can't be asked for, so the sender gets the help reply instead.
+ */
+export function missingFields(
+  issues: readonly { path: readonly PropertyKey[] }[],
+  askable: readonly string[],
+): string[] | null {
+  const fields = [...new Set(issues.map(({ path }) => String(path[0] ?? "")))];
+  if (!fields.length || fields.some((f) => !askable.includes(f))) return null;
+  return fields;
+}
+
+/** `args` with the `missing` fields that `reply` has a value for. */
+export function mergeFill(
+  args: Record<string, unknown>,
+  reply: Record<string, unknown> | null | undefined,
+  missing: readonly string[],
+): Record<string, unknown> {
+  const merged = { ...args };
+  for (const field of missing) {
+    const value = reply?.[field];
+    if (value !== undefined && value !== null) merged[field] = value;
+  }
+  return merged;
+}
+
+/** `args` without `fields`, e.g. invalid values to ask for again. */
+export function omitFields(
+  args: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(args).filter(([key]) => !fields.includes(key)),
+  );
+}
+
+/** Asks for the missing fields; fields sharing a question ask it once. */
+export function fillQuestion(
+  missing: readonly string[],
+  ask: Record<string, string>,
+): string {
+  const questions = [...new Set(missing.map((f) => ask[f]).filter(Boolean))];
+  return `IRPC: ${questions.join(" ")}`.slice(0, SMS_MAX_CHARS);
+}
+
 // GSM 03.38 basic set plus extension table (which costs 2 chars each).
 const GSM7 =
   "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
