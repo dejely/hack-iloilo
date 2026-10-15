@@ -3,6 +3,7 @@
 
 import "server-only";
 import { z } from "zod";
+import { optionalAiFields } from "./ai-schema";
 import { aiEnabled, extract } from "@/lib/ai";
 import { newRef } from "@/lib/ref";
 import { smsGateway } from "@/lib/sms";
@@ -286,24 +287,6 @@ function fromAi(command: Command<unknown>, args: unknown): unknown {
 const aiSchema = (command: Command<unknown>): z.ZodType<unknown> =>
   command.ai?.input?.schema ?? command.schema;
 
-/**
- * `fields` of an object schema as optional, so the AI can leave them out;
- * `only` drops the other fields. Keeps the schema's own settings.
- */
-function optional(
-  schema: z.ZodType<unknown>,
-  fields: readonly string[],
-  only = false,
-): z.ZodType<unknown> {
-  if (!(schema instanceof z.ZodObject) || !fields.length) return schema;
-  const object = schema as z.ZodObject<Record<string, z.ZodType>>;
-  // Zod types masks against a literal shape; this one is built at runtime.
-  const mask = Object.fromEntries(
-    fields.filter((f) => f in object.shape).map((f) => [f, true]),
-  ) as Record<never, true>;
-  return only ? object.pick(mask).partial() : object.partial(mask);
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -323,7 +306,10 @@ async function interpret(
     z
       .object({
         command: z.literal(keyword),
-        args: optional(aiSchema(command), Object.keys(command.ai!.ask ?? {})),
+        args: optionalAiFields(
+          aiSchema(command),
+          Object.keys(command.ai!.ask ?? {}),
+        ),
       })
       .describe(command.ai!.description),
   );
@@ -424,7 +410,7 @@ async function continueFill(
   let viaAi = false;
   if (!missing.every((f) => read?.[f] != null) && aiEnabled()) {
     const extracted = await extract(
-      optional(aiSchema(command), missing, true),
+      optionalAiFields(aiSchema(command), missing, true),
       `IRPC asked: "${fillQuestion(missing, ask)}"\nFarmer replied: "${body}"`,
     );
     viaAi = true;
