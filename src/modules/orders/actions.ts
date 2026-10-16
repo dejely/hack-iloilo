@@ -102,6 +102,8 @@ export async function requestRiceOnline(
       bookedByPhone: normalized,
       kg,
       pickupDate,
+      buyerName: name,
+      buyerType,
     });
     await notifyOrder(created, "recorded");
     revalidatePath("/buying");

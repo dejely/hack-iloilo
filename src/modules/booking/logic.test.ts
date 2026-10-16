@@ -18,6 +18,7 @@ import {
   parseMoveArgs,
   readBookingReply,
   readRef,
+  readRelativeDay,
   rescheduleAnswer,
   serviceOf,
   validateMove,
@@ -166,6 +167,34 @@ describe("canMove", () => {
   });
 });
 
+describe("readRelativeDay", () => {
+  // A Friday.
+  const today = "2026-10-16";
+  const day = (text: string) => readRelativeDay(text.split(" "), today);
+
+  it("reads today and tomorrow in Hiligaynon, Tagalog and English", () => {
+    for (const text of ["subong", "karon", "today"])
+      expect(day(text)).toBe("16/10");
+    for (const text of ["buas", "bukas", "tomorrow"])
+      expect(day(text)).toBe("17/10");
+  });
+
+  it("takes the next weekday after today", () => {
+    expect(day("sa lunes")).toBe("19/10");
+    expect(day("biyernes")).toBe("23/10");
+    expect(day("sabado")).toBe("17/10");
+  });
+
+  it("crosses months", () => {
+    expect(readRelativeDay(["buas"], "2026-10-31")).toBe("1/11");
+  });
+
+  it("returns null for none or two days", () => {
+    expect(day("palay")).toBeNull();
+    expect(day("indi buas sa lunes")).toBeNull();
+  });
+});
+
 describe("readRef", () => {
   it("reads a ref typed with dashes, spaces or lowercase", () => {
     expect(readRef(["k7p2qx"])).toBe("K7P2QX");
@@ -177,6 +206,12 @@ describe("readRef", () => {
   it("returns null without a 6-character ref", () => {
     expect(readRef([])).toBeNull();
     expect(readRef(["booking", "ko"])).toBeNull();
+    expect(readRef(["cancel", "ang", "booking", "ko"])).toBeNull();
+  });
+
+  it("prefers a ref with a digit over a six-letter word", () => {
+    expect(readRef(["ikansel", "K7P2QX", "please"])).toBe("K7P2QX");
+    expect(readRef(["KPQXMN"])).toBe("KPQXMN");
   });
 });
 
@@ -368,6 +403,20 @@ describe("readBookingReply", () => {
       unit: "sacks",
     });
     expect(readBookingReply("1,000!")).toEqual({ amount: 1000, unit: "kg" });
+  });
+
+  it("reads a full first text the AI may misread", () => {
+    expect(readBookingReply("pa galing ko gani 30 kilos")).toEqual({
+      service: "milling",
+      amount: 30,
+      unit: "kg",
+    });
+    expect(readBookingReply("kiskis ko 20 sako buas", "2026-10-16")).toEqual({
+      service: "milling",
+      amount: 20,
+      unit: "sacks",
+      dayMonth: "17/10",
+    });
   });
 
   it("leaves the service to ask when both are named", () => {

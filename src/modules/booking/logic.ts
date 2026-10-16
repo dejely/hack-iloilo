@@ -114,12 +114,58 @@ export const toKg = (value: number, unit: Unit = "kg"): number =>
   Math.round(value * { kg: 1, sacks: SACK_KG, tons: 1000 }[unit]);
 
 /**
- * Reads a plain follow-up reply to `bookingAsk` without AI: "1000" (kg, as
- * asked), "20 sako", "2 tons", "20/10", "pa-galing". A number is an amount
- * only with a unit or as the whole reply, so "sa Oct 20" isn't 20 kg. Null
- * when nothing is recognised.
+ * Reads plain booking values without AI: "1000" (kg, as asked), "20 sako",
+ * "2 tons", "20/10", "pa-galing", and with `today`, "buas" or "Lunes". A
+ * number is an amount only with a unit or as the whole reply, so "sa Oct 20"
+ * isn't 20 kg. Null when nothing is recognised.
  */
-export function readBookingReply(text: string): {
+// Days a farmer texts instead of a date, as days from today.
+const RELATIVE_DAYS: Record<string, number> = {
+  today: 0,
+  karon: 0,
+  subong: 0,
+  ngayon: 0,
+  tomorrow: 1,
+  tmrw: 1,
+  buas: 1,
+  bwas: 1,
+  bukas: 1,
+};
+// Sunday first, as `getUTCDay()` counts.
+const WEEKDAYS = [
+  ["domingo", "sunday", "sun"],
+  ["lunes", "monday", "mon"],
+  ["martes", "tuesday", "tue", "tues"],
+  ["miyerkoles", "miyerkules", "wednesday", "wed"],
+  ["huwebes", "thursday", "thu", "thurs"],
+  ["biyernes", "friday", "fri"],
+  ["sabado", "saturday", "sat"],
+];
+
+/**
+ * A relative day in `tokens` ("buas", "Lunes") as `d/m` from `today`. A
+ * weekday is the next one after today. Null when none, or two, are named.
+ */
+export function readRelativeDay(
+  tokens: readonly string[],
+  today: string,
+): string | null {
+  const offsets = new Set<number>();
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  for (const token of tokens) {
+    if (token in RELATIVE_DAYS) offsets.add(RELATIVE_DAYS[token]);
+    const day = WEEKDAYS.findIndex((names) => names.includes(token));
+    if (day >= 0) offsets.add(((day - weekday + 6) % 7) + 1);
+  }
+  if (offsets.size !== 1) return null;
+  const date = addDays(today, [...offsets][0]);
+  return `${Number(date.slice(8))}/${Number(date.slice(5, 7))}`;
+}
+
+export function readBookingReply(
+  text: string,
+  today?: string,
+): {
   amount?: number;
   unit?: "kg" | "sacks";
   dayMonth?: string;
@@ -134,7 +180,8 @@ export function readBookingReply(text: string): {
   const read: NonNullable<ReturnType<typeof readBookingReply>> = {};
 
   const dayMonth = tokens.find((t) => /^\d{1,2}\/\d{1,2}$/.test(t));
-  if (dayMonth) read.dayMonth = dayMonth;
+  const relative = today && !dayMonth ? readRelativeDay(tokens, today) : null;
+  if (dayMonth ?? relative) read.dayMonth = dayMonth ?? relative!;
 
   const unit = tokens.map(unitOf).find(Boolean);
   for (let i = 0; i < tokens.length && read.amount === undefined; i++) {
@@ -398,10 +445,20 @@ export const bookingSms = {
 // "+2", "±2", "+-2", "+/-2", "+2days", "+2 adlaw" is split, so the number only.
 const FLEX_ARG = /^(?:[±+]|\+-|\+\/-)(\d+)(?:d|days?|adlaw)?$/i;
 
-/** A ref as texted: "k7p2qx", "K7P-2QX", or split as "K7P 2QX". */
+// Six-letter words in a cancel text that aren't refs.
+const NOT_REFS = new Set(["CANCEL", "KANSEL", "BOOKED", "PLEASE", "SALAMAT"]);
+
+/**
+ * A ref as texted: "k7p2qx", "K7P-2QX", or split as "K7P 2QX". One with a
+ * digit wins, so "cancel ang booking K7P2QX" isn't read as "CANCEL".
+ */
 export function readRef(args: readonly string[]): string | null {
-  const candidates = [...args.map(cleanRef), cleanRef(args.join(""))];
-  return candidates.filter((t) => /^[A-Z0-9]{6}$/.test(t)).at(-1) ?? null;
+  const candidates = [...args.map(cleanRef), cleanRef(args.join(""))].filter(
+    (t) => /^[A-Z0-9]{6}$/.test(t) && !NOT_REFS.has(t),
+  );
+  return (
+    candidates.filter((t) => /\d/.test(t)).at(-1) ?? candidates.at(-1) ?? null
+  );
 }
 
 // Words people add to a booking: "BOOK DRY 1000 kg sa 20/10 po".

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  readSellReply,
   applyOverride,
   budgetStatus,
   formatVarietiesSms,
@@ -284,5 +285,19 @@ describe("budgetStatus", () => {
 
   it("goes negative when purchases exceed the budget", () => {
     expect(budgetStatus(1000000, [1500000]).remainingMinor).toBe(-500000);
+  });
+});
+
+describe("natural-language sell offer values", () => {
+  it("keeps harvest and delivery dates distinct in either order", () => {
+    expect(
+      readSellReply("sell 3000 kg RC222 palay, delivery 25/10", "2026-10-16"),
+    ).toMatchObject({ amount: 3000, varietyCode: "RC222", dayMonth: "" });
+    expect(
+      readSellReply("harvest 20/10, delivery 25/10", "2026-10-16"),
+    ).toMatchObject({ dayMonth: "20/10" });
+    expect(
+      readSellReply("delivery 25/10, harvested 20/10", "2026-10-16"),
+    ).toMatchObject({ dayMonth: "20/10" });
   });
 });

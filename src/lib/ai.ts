@@ -82,7 +82,7 @@ export async function extract<T>(
     available.push(choice.index);
   }
   const order = providerOrder(available.length, Boolean(pool.openRouter));
-  const system = `Extract the farmer's request from this SMS, which may be in Hiligaynon, Tagalog, English or a mix. Today is ${todayManila()}. Copy amounts exactly as stated, in the farmer's unit; never convert units or calculate. Leave out anything not stated.`;
+  const system = `Extract the client's request from this SMS, which may be in Hiligaynon, Tagalog, English or a mix. Today is ${todayManila()}. Copy amounts exactly as stated, in the client's unit; never convert units or calculate. Leave out anything not stated.`;
   for (const [attempt, provider] of order.entries()) {
     const now = Date.now();
     const timeout = attemptTimeout(deadline, now, order.length - attempt);

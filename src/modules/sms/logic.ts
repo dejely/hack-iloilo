@@ -126,6 +126,21 @@ export function parseAnswer({
   const yes = answerWord(word, YES_WORDS);
   if (!yes && !answerWord(word, NO_WORDS)) return null;
   if (args.length > MAX_ANSWER_WORDS - 1) return null;
+  // Extra meaning is a correction/clarification, never a bare confirmation.
+  const qualifiers =
+    /^(BUT|PERO|GALI|KUN|IF|EXCEPT|CHANGE|TWENTY|THIRTY|CANCEL|INSTEAD|MONDAY|FRIDAY|SUNDAY|SABADO)$/i;
+  if (args.some((arg) => qualifiers.test(arg))) return null;
+  const courtesy = /^(PLEASE|PLS|PO|SALAMAT|THANKS|THANK|YOU|LANG|NA)$/i;
+  if (
+    args.some(
+      (arg) =>
+        !courtesy.test(arg) &&
+        !YES_WORDS.has(arg.toUpperCase()) &&
+        !/^[A-Z0-9]{6}$/i.test(arg),
+    )
+  )
+    return null;
+
   const ref = args.find((a) => /^[A-Z0-9]{6}$/i.test(a))?.toUpperCase();
   return { yes, ...(ref && { ref }) };
 }

@@ -146,6 +146,20 @@ describe("parseAnswer", () => {
     expect(answer("yes please")).toEqual({ yes: true, ref: "PLEASE" });
   });
 
+  it("never treats corrections or negated answers as approval", () => {
+    for (const text of [
+      "yes but 25 sacks",
+      "huo pero 25",
+      "yes 100kg",
+      "no tomorrow",
+      "indi anay buwas",
+      "yes not yet",
+      "yes if available",
+      "yes monday",
+    ])
+      expect(answer(text)).toBeNull();
+  });
+
   it("leaves longer texts and other keywords alone", () => {
     expect(answer("ok book dry 20 sacks monday")).toBeNull();
     expect(answer("BOOK A")).toBeNull();

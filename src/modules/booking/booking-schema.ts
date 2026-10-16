@@ -43,10 +43,18 @@ export const bookingSmsSchema = bookingSchema
       .regex(/^\d{1,2}\/\d{1,2}$/)
       .describe("Preferred day as day/month, e.g. 20/10"),
   });
+
+/** The AI reading's service, with the local words farmers text for each. */
+const aiService = z
+  .enum(services)
+  .describe(
+    "drying: dry, bulad, bilad, pauga, tuyo (pa-dry, pabulad). milling: mill, galing, giling, kiskis (pa-galing, pagaling, paggiling, pakiskis).",
+  );
 export type BookingSmsInput = z.infer<typeof bookingSmsSchema>;
 
 /** A free-text booking as AI reads it: the amount as stated, converted by `bookingFromAi`. */
 export const bookingAiSchema = bookingSmsSchema.omit({ estKg: true }).extend({
+  service: aiService,
   amount: z
     .number()
     .positive()

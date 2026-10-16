@@ -51,6 +51,7 @@ import {
 // Command registrations: each module's `sms.ts` calls `registerCommand()`.
 import "@/modules/booking/sms";
 import "@/modules/buying/sms";
+import "@/modules/orders/sms";
 import "@/modules/gate/sms";
 import "@/modules/pricing/sms";
 
@@ -233,16 +234,36 @@ async function route(
   }
 
   const command = findCommand(parsed.keyword);
+  const activeFill = await latestOpenFill(ctx.phone);
+  if (activeFill && body.length > MAX_AI_CHARS)
+    return { reply: smsReplies.tooLong };
+  if (
+    activeFill?.payload &&
+    (activeFill.payload as FillPayload).keyword === "CLARIFY" &&
+    !isHelp(parsed.keyword)
+  )
+    return continueFill(activeFill, body, ctx);
   if (!command) {
     if (isHelp(parsed.keyword)) return { reply: help(aiEnabled()) };
     // A wall of text is not a request; it also keeps AI costs bounded.
     if (body.length > MAX_AI_CHARS) return { reply: smsReplies.tooLong };
-    const fill = await latestOpenFill(ctx.phone);
-    if (fill) return continueFill(fill, body, ctx);
+    if (activeFill) return continueFill(activeFill, body, ctx);
+    const pending = await latestOpenPrompt(ctx.phone);
+    if (pending?.kind === "ai_confirm") {
+      const old = pending.payload as { keyword: string };
+      const owner = findCommand(old.keyword);
+      const correction =
+        owner?.ai?.readReply?.(body) ||
+        parseAnswer({ keyword: parsed.keyword, args: [] }) ||
+        /\b(change|instead|actually|gali|ilisan|pero)\b/i.test(body);
+      if (correction) return reviseConfirmation(pending, body, ctx);
+      await setPromptStatus(pending.id, "open", "expired");
+    }
     return interpret(body, ctx);
   }
   // A keyword starts over, so a pending follow-up question no longer applies.
-  await closePrompts(ctx.phone, ["ai_fill"]);
+  if (command.ai?.summary || command.confirm || !command.ai)
+    await closePrompts(ctx.phone, ["ai_fill", "ai_confirm"]);
   const reply = await runKeyword(command, parsed, ctx);
   if (reply !== null) return { reply };
   // A keyword with words AI can read, e.g. "BOOK dry 20 sako sa Lunes".
@@ -272,6 +293,11 @@ async function runKeyword(
   }
   const result = command.schema.safeParse(args);
   if (!result.success) return null;
+  if (command.confirm) {
+    if (forPhone && forPhone !== ctx.phone)
+      return "IRPC: Ang BUY para sa imo kaugalingon nga number lang. Palihog indi gamiton ang FOR.";
+    return beginReading(command, command.keywords[0], result.data, ctx);
+  }
   return command.handle(result.data, { ...ctx, forPhone });
 }
 
@@ -290,6 +316,55 @@ const aiSchema = (command: Command<unknown>): z.ZodType<unknown> =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Validate conditional fields and server-side references before asking to save. */
+async function checkReading(
+  command: Command<unknown>,
+  args: unknown,
+  ctx: CommandContext,
+) {
+  const defaults = command.ai?.defaults?.(ctx) ?? {};
+  const values = isRecord(args)
+    ? {
+        ...defaults,
+        ...Object.fromEntries(
+          Object.entries(args).filter(
+            ([, v]) => v !== undefined && v !== null && v !== "",
+          ),
+        ),
+      }
+    : args;
+  const reading = aiSchema(command).safeParse(values);
+  const fields = Object.keys(command.ai?.ask ?? {});
+  const missing = reading.success
+    ? ((await command.ai?.validate?.(reading.data, ctx)) ?? [])
+    : missingFields(reading.error.issues, fields);
+  return { reading, missing, args: values };
+}
+
+async function beginReading(
+  command: Command<unknown>,
+  keyword: string,
+  args: unknown,
+  ctx: CommandContext,
+): Promise<string> {
+  const checked = await checkReading(command, args, ctx);
+  if (checked.reading.success && !checked.missing?.length)
+    return finishAi(command, keyword, checked.reading.data, ctx);
+  if (!checked.missing?.length || !isRecord(checked.args)) return help(true);
+  await closePrompts(ctx.phone, ["ai_fill", "ai_confirm"]);
+  await openPrompt({
+    phone: ctx.phone,
+    kind: "ai_fill",
+    payload: {
+      keyword,
+      args: omitFields(checked.args, checked.missing),
+      missing: checked.missing,
+      asks: 1,
+    } as Json,
+  });
+  return fillQuestion(checked.missing, command.ai?.ask ?? {});
+}
+
 /**
  * Reads free text as a command with AI. Missing values are asked for first;
  * commands with a summary ask to confirm and run on a yes. AI failure gets
@@ -298,6 +373,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 async function interpret(
   body: string,
   ctx: CommandContext,
+  context?: string,
 ): Promise<{ reply: string; viaAi?: boolean }> {
   const commands = aiCommands();
   if (!aiEnabled() || !commands.length) return { reply: help() };
@@ -313,50 +389,53 @@ async function interpret(
       })
       .describe(command.ai!.description),
   );
+  const clarify = z
+    .object({ command: z.literal("CLARIFY") })
+    .describe(
+      "Buying versus selling or rice versus palay is unclear. Do not guess the direction or product.",
+    );
   const none = z
     .object({ command: z.literal("NONE") })
     .describe("The text matches none of the other commands.");
   const intent = await extract(
-    z.object({ intent: z.union([none, ...options]) }),
-    body,
+    z.object({ intent: z.union([none, clarify, ...options]) }),
+    context ? `${context}\nClient clarification: ${body}` : body,
   );
   // AI down or timed out: fall back to the keyword formats.
   if (!intent) return { reply: help() };
   if (intent.intent.command === "NONE") return { reply: help(true) };
+  if (intent.intent.command === "CLARIFY") {
+    await closePrompts(ctx.phone, ["ai_confirm", "ai_fill"]);
+    await openPrompt({
+      phone: ctx.phone,
+      kind: "ai_fill",
+      payload: {
+        keyword: "CLARIFY",
+        args: { text: body },
+        missing: ["direction"],
+        asks: 1,
+      },
+    });
+    return { reply: tradeClarification, viaAi: true };
+  }
 
-  const { command: keyword, args } = intent.intent as {
+  const { command: keyword, args: read } = intent.intent as {
     command: string;
     args: unknown;
   };
   const command = findCommand(keyword);
   if (!command?.ai) return { reply: help(true) };
 
-  const reading = aiSchema(command).safeParse(args);
-  if (reading.success)
-    return {
-      reply: await finishAi(command, keyword, reading.data, ctx),
-      viaAi: true,
-    };
-
-  // Ask only for what's missing; code, not AI, decides what that is.
+  // Code reads plain values too and wins: models miss or misread local
+  // words ("pa galing" is milling, not drying), and code never guesses.
   const ask = command.ai.ask ?? {};
-  const missing = missingFields(reading.error.issues, Object.keys(ask));
-  if (!missing || !isRecord(args)) return { reply: help(true) };
-  const payload: FillPayload = {
-    keyword,
-    args: omitFields(args, missing),
-    missing,
-    asks: 1,
+  const args = isRecord(read)
+    ? mergeFill(read, command.ai.readReply?.(body), Object.keys(ask))
+    : read;
+  return {
+    reply: await beginReading(command, keyword, args, ctx),
+    viaAi: true,
   };
-  // This request supersedes an unanswered confirmation, so a plain YES can't
-  // be meant for it.
-  await closePrompts(ctx.phone, ["ai_confirm"]);
-  await openPrompt({
-    phone: ctx.phone,
-    kind: "ai_fill",
-    payload: payload as Json,
-  });
-  return { reply: fillQuestion(missing, ask), viaAi: true };
 }
 
 /** Runs a complete AI reading, asking to confirm first when it has a summary. */
@@ -371,10 +450,11 @@ async function finishAi(
 
   const { summary } = command.ai;
   if (!summary) return command.handle(valid.data, ctx);
+  await closePrompts(ctx.phone, ["ai_confirm"]);
   await openPrompt({
     phone: ctx.phone,
     kind: "ai_confirm",
-    payload: { keyword, args: valid.data as Json },
+    payload: { keyword, args: valid.data as Json, reading: reading as Json },
   });
   return aiConfirmText(summary(valid.data));
 }
@@ -399,6 +479,12 @@ async function continueFill(
   ctx: CommandContext,
 ): Promise<{ reply: string; viaAi?: boolean }> {
   const { keyword, args, missing, asks } = prompt.payload as FillPayload;
+  if (keyword === "CLARIFY") {
+    if (!(await setPromptStatus(prompt.id, "open", "accepted")))
+      return { reply: smsReplies.alreadyAnswered };
+    if (!aiEnabled()) return { reply: help() };
+    return interpret(body, ctx, `Original message: ${String(args.text)}`);
+  }
   const command = findCommand(keyword);
   if (!command?.ai) {
     await setPromptStatus(prompt.id, "open", "expired");
@@ -406,12 +492,12 @@ async function continueFill(
   }
   const ask = command.ai.ask ?? {};
 
-  let read = command.ai.readReply?.(body) ?? null;
+  let read = command.ai.readReply?.(body, missing) ?? null;
   let viaAi = false;
   if (!missing.every((f) => read?.[f] != null) && aiEnabled()) {
     const extracted = await extract(
       optionalAiFields(aiSchema(command), missing, true),
-      `IRPC asked: "${fillQuestion(missing, ask)}"\nFarmer replied: "${body}"`,
+      `IRPC asked: "${fillQuestion(missing, ask)}"\nClient replied: "${body}"`,
     );
     viaAi = true;
     if (isRecord(extracted)) {
@@ -424,9 +510,11 @@ async function continueFill(
     }
   }
 
-  const merged = mergeFill(args, read, missing);
-  const reading = aiSchema(command).safeParse(merged);
-  if (reading.success) {
+  // Include explicit corrections to previously supplied fields as well.
+  const merged = mergeFill(args, read, Object.keys(ask));
+  const checked = await checkReading(command, merged, ctx);
+  const { reading } = checked;
+  if (reading.success && !checked.missing?.length) {
     if (!(await setPromptStatus(prompt.id, "open", "accepted")))
       return { reply: smsReplies.alreadyAnswered, viaAi };
     return {
@@ -435,8 +523,8 @@ async function continueFill(
     };
   }
 
-  const still = missingFields(reading.error.issues, Object.keys(ask));
-  if (!still || asks >= MAX_FILL_ASKS) {
+  const still = checked.missing;
+  if (!still || asks >= (command.ai.maxAsks ?? MAX_FILL_ASKS)) {
     await setPromptStatus(prompt.id, "open", "expired");
     return { reply: help(true), viaAi };
   }
@@ -455,6 +543,66 @@ async function continueFill(
   return { reply: fillQuestion(still, ask), viaAi };
 }
 
+const tradeClarification =
+  "IRPC: Gusto mo magbakal sang bugas ukon magbaligya sang palay? Palihog isugid ang produkto kag kon bakal ukon baligya.";
+
+/** A qualified answer edits the reading; it never answers the old confirmation. */
+async function reviseConfirmation(
+  prompt: SmsPrompt,
+  body: string,
+  ctx: CommandContext,
+): Promise<{ reply: string; viaAi?: boolean }> {
+  const payload = prompt.payload as {
+    keyword: string;
+    args: Json;
+    reading?: Json;
+  };
+  const command = findCommand(payload.keyword);
+  if (!command?.ai) return { reply: help() };
+  const fields = Object.keys(command.ai.ask ?? {});
+  let changes = command.ai.readReply?.(body, fields) ?? null;
+  let viaAi = false;
+  if (aiEnabled()) {
+    const correction = await extract(
+      z.object({
+        action: z.enum(["correct", "new", "unclear"]),
+        changes: optionalAiFields(aiSchema(command), fields),
+      }),
+      `Pending request: ${JSON.stringify(payload.reading ?? payload.args)}. Client replied: ${body}. Extract only explicitly changed fields. Use new for a different intent/product or unrelated request; unclear if there is no clear correction. Never treat qualified yes/no as approval.`,
+    );
+    viaAi = true;
+    if (correction?.action === "new") {
+      await setPromptStatus(prompt.id, "open", "expired");
+      return interpret(body, ctx);
+    }
+    if (correction?.action === "correct" && isRecord(correction.changes))
+      changes = { ...correction.changes, ...changes };
+    else if (correction?.action === "unclear") changes = null;
+  }
+  if (!changes || !Object.keys(changes).length)
+    return {
+      reply:
+        "IRPC: Palihog YES ukon NO lang kon husto ang detalye. Kon may bag-o nga detalye, isugid ang gusto mo ilisan.",
+      viaAi,
+    };
+  if (!(await setPromptStatus(prompt.id, "open", "expired")))
+    return { reply: smsReplies.alreadyAnswered, viaAi };
+  const old = payload.reading ?? payload.args;
+  const merged = isRecord(old) ? mergeFill(old, changes, fields) : changes;
+  // A changed unit invalidates the old per-sack assumption.
+  if (
+    isRecord(merged) &&
+    changes.unit &&
+    changes.unit !== (isRecord(old) ? old.unit : undefined) &&
+    changes.kgPerSack === undefined
+  )
+    delete merged.kgPerSack;
+  return {
+    reply: await beginReading(command, payload.keyword, merged, ctx),
+    viaAi,
+  };
+}
+
 onPromptAnswer("ai_confirm", async (prompt, yes, ctx) => {
   if (prompt.phone !== ctx.phone) throw new PromptRefusal(help());
   if (!yes) return smsReplies.aiDeclined;
@@ -463,7 +611,7 @@ onPromptAnswer("ai_confirm", async (prompt, yes, ctx) => {
   const command = findCommand(keyword);
   const valid = command?.schema.safeParse(args);
   if (!command || !valid?.success) return help();
-  return command.handle(valid.data, ctx);
+  return command.handle(valid.data, { ...ctx, promptId: prompt.id });
 });
 
 async function answerPrompt(
@@ -480,7 +628,8 @@ async function answerPrompt(
       .limit(1);
     if (error) throw error;
     // A late reply to a known closed reference must not answer another stage.
-    if (data.length) return smsReplies.noPrompt;
+    if (data.length || !["PLEASE", "THANKS"].includes(ref))
+      return smsReplies.noPrompt;
   }
   const prompt = referenced || (await latestOpenPrompt(ctx.phone));
   const handler = prompt && promptHandler(prompt.kind);

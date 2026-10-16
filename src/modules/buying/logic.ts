@@ -2,6 +2,7 @@
 // Pure functions only: no I/O and no imports from other modules. Unit-test here.
 
 import { z } from "zod";
+import { readTradeValues, tradeDay } from "@/lib/sms-trade";
 import { formatKg, formatMoneySms } from "@/lib/format";
 import type { StatusTone } from "@/lib/status";
 import type { Database } from "@/lib/supabase/database.types";
@@ -140,7 +141,7 @@ export function parseQuoteArgs(args: string[]): unknown {
 export const sellSmsSchema = z.object({
   estKg: z.number().int().positive().max(MAX_SMS_KG),
   varietyCode: z.string().min(1),
-  dayMonth: z.string().regex(/^\d{1,2}\/\d{1,2}$/),
+  dayMonth: z.string().regex(/^(?:\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})$/),
 });
 export type SellSmsInput = z.infer<typeof sellSmsSchema>;
 
@@ -310,4 +311,32 @@ export function budgetStatus(
 ): BudgetStatus {
   const usedMinor = purchaseTotalsMinor.reduce((sum, t) => sum + t, 0);
   return { usedMinor, remainingMinor: budgetMinor - usedMinor };
+}
+
+/** Pure reading of labelled values; variety codes are resolved on the server. */
+export function readSellReply(
+  text: string,
+  today: string,
+  fields: readonly string[] = [],
+): Record<string, unknown> | null {
+  const values = readTradeValues(text, today, fields) ?? {};
+  // Delivery and harvest dates must never be interchanged by a reading.
+  if (/\b(delivery|deliver|pickup|appointment)\b/i.test(text)) {
+    const harvest = text.match(
+      /\bharvest(?:ed)?\b(.+?)(?=\b(?:delivery|deliver|pickup|appointment)\b|$)/i,
+    )?.[1];
+    values.dayMonth = harvest ? (tradeDay(harvest, today) ?? "") : "";
+  }
+  const code = text
+    .match(/\b(?:RC|NSIC|PSB)[ -]?\d+\b/i)?.[0]
+    .replace(/[ -]/g, "")
+    .toUpperCase();
+  if (code) values.varietyCode = code;
+  else if (
+    fields.length === 1 &&
+    fields[0] === "varietyCode" &&
+    /^[A-Za-z0-9-]{1,20}$/.test(text.trim())
+  )
+    values.varietyCode = text.trim().toUpperCase();
+  return Object.keys(values).length ? values : null;
 }

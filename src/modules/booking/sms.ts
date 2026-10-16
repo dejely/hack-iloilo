@@ -48,7 +48,7 @@ registerCommand({
         date: parseDayMonth(cmd.dayMonth, todayManila()),
       }),
     ask: bookingAsk,
-    readReply: readBookingReply,
+    readReply: (text) => readBookingReply(text, todayManila()),
   },
 });
 

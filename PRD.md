@@ -154,7 +154,7 @@ flowchart LR
 
 **P1**
 
-- **Plain-language texts:** AI reads free text (converting sacks to kilos), replies with what it understood, and saves nothing until the sender confirms.
+- **Plain-language texts:** AI reads free text for booking, rice buying, palay selling and quotes. Code validates dates, converts units and computes prices. Missing details are asked for; transactions are saved only after confirmation. Buying/selling asks for kg per sack instead of assuming a sack weight. Corrections require a fresh confirmation.
 - **Queue status:** `STATUS` returns the sender's place in line.
 
 ### M4. Booking
@@ -182,7 +182,7 @@ The input end for IRPC-owned palay. Private mills win on fast, clear quotes, and
 **P0**
 
 - **Quote:** from a staff form or by SMS. Estimated MC (and kilos) gives an estimated price per kilo and total.
-- **Sell offer:** from a staff form or by SMS. Kilos, variety and harvest date. Offers feed capacity as expected arrivals.
+- **Sell offer:** from a staff form or by SMS, including natural Hiligaynon, English and Tagalog texts. Kilos, variety and harvest date. Offers feed capacity as expected arrivals.
 - **Selling list:** the manager accepts or declines offers.
 - **Price at receiving:** computed like the paper Receiving Report from weight, MC, damage, immature grains, foreign matter and sacks. Shown to the encoder and texted to the farmer.
 - **Purchase record:** kilos, price, deductions and voucher number. The app doesn't pay.
@@ -275,7 +275,7 @@ The output end, mirroring the farmer side: buyers get a form and tracking, as fa
 
 **P0**
 
-- **Web request:** name, phone, buyer type, kilos and pickup date (up to 30 days ahead) from a phone browser. The buyer is texted a code.
+- **Rice request:** name, phone, buyer type, kilos and pickup date (up to 30 days ahead) from a phone browser or SMS. Natural-language SMS asks for missing details and confirms before saving; `BUY` remains available without AI. Buyer details belong to the request, allowing an existing farmer to buy without changing their profile. The buyer is texted a code.
 - **Tracking:** `/buy/track` with code and phone shows the status. The buyer can cancel while it's requested or accepted.
 - **Rice Buying list:** the manager accepts or declines, and the buyer is texted. At pickup, staff record the sale from a batch (kg, price, receipt no.), which texts the receipt and batch no. and links the buyer to the batch.
 - **Price at pickup:** the request shows today's rice price as an estimate; the dispatch sets the final price. The app doesn't take payment.

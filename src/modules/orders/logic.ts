@@ -1,6 +1,7 @@
 // M11. Rice Buying: rice requests from buyers. See PRD.md.
 // Pure functions only: no I/O and no imports from other modules. Unit-test here.
 
+import { readTradeValues } from "@/lib/sms-trade";
 import { daysBetween } from "@/lib/dates";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StatusTone } from "@/lib/status";
@@ -88,3 +89,73 @@ export const orderSms = {
     "IRPC: Pasensya, indi ma-serve ang request {ref} ({kg} bugas, {date}). I-text ang PRICE para sa presyo subong.",
   cancelled: "IRPC: Kanselado na ang request {ref}.",
 } as const;
+
+/** Known account details are defaults, not AI-generated values. */
+export function smsBuyerDefaults(client: {
+  name: string;
+  buyer_type: Database["public"]["Enums"]["buyer_type"] | null;
+}): Record<string, unknown> {
+  return {
+    ...(/^SMS \d{4}$/.test(client.name) ? {} : { name: client.name }),
+    ...(client.buyer_type ? { buyerType: client.buyer_type } : {}),
+  };
+}
+export function readBuyReply(
+  text: string,
+  today: string,
+  fields: readonly string[] = [],
+): Record<string, unknown> | null {
+  const values = readTradeValues(text, today, fields) ?? {};
+  const type = text
+    .toLowerCase()
+    .match(
+      /\b(wholesaler|retailer|institutional|cooperative|drop_point|subsidy_program)\b/,
+    )?.[1];
+  if (type) values.buyerType = type;
+  const labelled = text
+    .match(
+      /\bNAME\s+(.+?)(?=\s+(?:wholesaler|retailer|institutional|cooperative|drop_point|subsidy_program)\b|$)/i,
+    )?.[1]
+    .trim();
+  if (labelled) values.name = labelled;
+  else if (
+    fields.includes("name") &&
+    Object.keys(values).length === 0 &&
+    /^[\p{L}][\p{L} .'-]{1,99}$/u.test(text.trim()) &&
+    !/^(yes|no|huo|indi|banana|ambot|hello|thanks)$/i.test(text.trim())
+  )
+    values.name = text.trim();
+  return Object.keys(values).length ? values : null;
+}
+export function parseBuyArgs(args: string[], today: string): unknown {
+  const first = args[0]?.match(/^(\d{1,3}(?:,\d{3})+|\d+)(?:kg)?$/i);
+  if (!first) return null;
+  const offset = /^(kg|kilos?)$/i.test(args[1] ?? "") ? 2 : 1;
+  const dayMonth = args[offset];
+  if (!dayMonth || !/^(?:\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})$/.test(dayMonth))
+    return null;
+  const rest = args.slice(offset + 1).join(" ");
+  const extra = rest ? readBuyReply(rest, today) : {};
+  // Reject arbitrary trailing words rather than silently accepting them.
+  if (rest && !extra) return null;
+  return {
+    amount: Number(first[1].replace(/,/g, "")),
+    unit: "kg",
+    dayMonth,
+    ...extra,
+  };
+}
+
+export function orderBuyerDetails(order: {
+  buyer_name: string | null;
+  buyer_type: Database["public"]["Enums"]["buyer_type"] | null;
+  client: {
+    name: string;
+    buyer_type: Database["public"]["Enums"]["buyer_type"] | null;
+  } | null;
+}): { name: string; type: Database["public"]["Enums"]["buyer_type"] | null } {
+  return {
+    name: order.buyer_name ?? order.client?.name ?? "—",
+    type: order.buyer_type ?? order.client?.buyer_type ?? null,
+  };
+}

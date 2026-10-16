@@ -385,14 +385,14 @@ isOneToOne: false
                   ]
                 },"rice_orders": {
                   Row: {
-                    "booked_by_phone": string,"client_id": string,"created_at": string,"dispatch_id": string | null,"facility_id": string,"id": string,"kg": number,"pickup_date": string,"ref": string,"status": Database["public"]['Enums']["rice_order_status"],"updated_at": string
+                    "booked_by_phone": string,"buyer_name": string | null,"buyer_type": Database["public"]['Enums']["buyer_type"] | null,"client_id": string,"created_at": string,"dispatch_id": string | null,"facility_id": string,"id": string,"kg": number,"pickup_date": string,"ref": string,"sms_prompt_id": string | null,"status": Database["public"]['Enums']["rice_order_status"],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "booked_by_phone": string,"client_id": string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id": string,"id"?: string,"kg": number,"pickup_date": string,"ref": string,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
+                    "booked_by_phone": string,"buyer_name"?: string | null,"buyer_type"?: Database["public"]['Enums']["buyer_type"] | null,"client_id": string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id": string,"id"?: string,"kg": number,"pickup_date": string,"ref": string,"sms_prompt_id"?: string | null,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
                   }
                   Update: {
-                    "booked_by_phone"?: string,"client_id"?: string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id"?: string,"id"?: string,"kg"?: number,"pickup_date"?: string,"ref"?: string,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
+                    "booked_by_phone"?: string,"buyer_name"?: string | null,"buyer_type"?: Database["public"]['Enums']["buyer_type"] | null,"client_id"?: string,"created_at"?: string,"dispatch_id"?: string | null,"facility_id"?: string,"id"?: string,"kg"?: number,"pickup_date"?: string,"ref"?: string,"sms_prompt_id"?: string | null,"status"?: Database["public"]['Enums']["rice_order_status"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -413,18 +413,24 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "facilities"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rice_orders_sms_prompt_id_fkey"
+      columns: ["sms_prompt_id"]
+isOneToOne: true
+      referencedRelation: "sms_prompts"
+      referencedColumns: ["id"]
     }
                   ]
                 },"sell_offers": {
                   Row: {
-                    "booked_by_phone": string,"client_id": string,"created_at": string,"est_kg": number,"facility_id": string,"harvest_date": string,"id": string,"ref": string,"status": Database["public"]['Enums']["sell_offer_status"],"updated_at": string,"variety_id": string | null
+                    "booked_by_phone": string,"client_id": string,"created_at": string,"est_kg": number,"facility_id": string,"harvest_date": string,"id": string,"ref": string,"sms_prompt_id": string | null,"status": Database["public"]['Enums']["sell_offer_status"],"updated_at": string,"variety_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "booked_by_phone": string,"client_id": string,"created_at"?: string,"est_kg": number,"facility_id": string,"harvest_date": string,"id"?: string,"ref": string,"status"?: Database["public"]['Enums']["sell_offer_status"],"updated_at"?: string,"variety_id"?: string | null
+                    "booked_by_phone": string,"client_id": string,"created_at"?: string,"est_kg": number,"facility_id": string,"harvest_date": string,"id"?: string,"ref": string,"sms_prompt_id"?: string | null,"status"?: Database["public"]['Enums']["sell_offer_status"],"updated_at"?: string,"variety_id"?: string | null
                   }
                   Update: {
-                    "booked_by_phone"?: string,"client_id"?: string,"created_at"?: string,"est_kg"?: number,"facility_id"?: string,"harvest_date"?: string,"id"?: string,"ref"?: string,"status"?: Database["public"]['Enums']["sell_offer_status"],"updated_at"?: string,"variety_id"?: string | null
+                    "booked_by_phone"?: string,"client_id"?: string,"created_at"?: string,"est_kg"?: number,"facility_id"?: string,"harvest_date"?: string,"id"?: string,"ref"?: string,"sms_prompt_id"?: string | null,"status"?: Database["public"]['Enums']["sell_offer_status"],"updated_at"?: string,"variety_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -438,6 +444,12 @@ isOneToOne: false
       columns: ["facility_id"]
 isOneToOne: false
       referencedRelation: "facilities"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sell_offers_sms_prompt_id_fkey"
+      columns: ["sms_prompt_id"]
+isOneToOne: true
+      referencedRelation: "sms_prompts"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sell_offers_variety_id_fkey"
@@ -555,6 +567,9 @@ isOneToOne: false
                            },
 "record_batch_measurement":
 { Args: { "p_batch_id": string,"p_fields": Json,"p_ref": string,"p_stage": string }; Returns: Json
+                           },
+"reserve_sms_rice_request":
+{ Args: { "p_phone": string,"p_prompt_id": string }; Returns: boolean
                            }
           }
           Enums: {
