@@ -11,7 +11,12 @@ import {
   coolDownKey,
   quotaCooldown,
 } from "./ai-keys";
-import { providerOrder, providerFailure, attemptTimeout } from "./ai-providers";
+import {
+  providerOrder,
+  providerFailure,
+  providerFailureDetails,
+  attemptTimeout,
+} from "./ai-providers";
 
 function createPool() {
   const config = env();
@@ -117,6 +122,7 @@ export async function extract<T>(
     } catch (error) {
       const failure = providerFailure(error, Date.now());
       console.warn("[ai:provider]", provider, "failed", failure);
+      console.warn("[ai:failure]", provider, providerFailureDetails(error));
       const until =
         failure === "quota" ? quotaCooldown(error, Date.now()) : null;
       if (index !== null && until !== null) {
