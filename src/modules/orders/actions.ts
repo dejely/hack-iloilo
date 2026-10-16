@@ -4,7 +4,6 @@
 // Server actions. Check the staff role first with requireRole().
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import type { z } from "zod";
 import { todayManila } from "@/lib/dates";
 import { requireRole } from "@/modules/accounts/auth";
@@ -17,7 +16,7 @@ import {
 import { cleanRef, TRACK_WINDOW_MINUTES } from "@/modules/booking/logic";
 import { recordTrackFailure, trackLocked } from "@/modules/booking/queries";
 import { dispatch, GateError } from "@/modules/gate/queries";
-import { pickupDateError, REQUEST_LIMITS } from "./logic";
+import { pickupDateError } from "./logic";
 import {
   pickupSchema,
   webOrderSchema,
@@ -30,8 +29,6 @@ import {
   createOrder,
   findOrder,
   notifyOrder,
-  recordRequest,
-  requestLocked,
   setOrderStatus,
   trackedOrder,
   type Order,
@@ -61,19 +58,10 @@ export type OrderOnlineResult =
       fieldErrors?: Partial<Record<keyof WebOrderInput, string>>;
     };
 
-/** The caller's IP as the proxy forwards it; "unknown" groups callers without one. */
-async function callerIp(): Promise<string> {
-  const forwarded = (await headers()).get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
-}
-
-const REQUEST_LOCKED = `Too many requests. Wait ${REQUEST_LIMITS.windowMinutes} minutes and try again.`;
-
 /**
  * Rice request from the public /buy page, without requireRole(): like /sell,
  * it can only create a `requested` order for the entered phone, which is
- * texted the ref. Nothing is held until a manager accepts. Limited per phone
- * and per IP, so the form can't be used to text many numbers.
+ * texted the ref. Nothing is held until a manager accepts.
  */
 export async function requestRiceOnline(
   input: unknown,
@@ -87,10 +75,6 @@ export async function requestRiceOnline(
     return { status: "error", fieldErrors: { pickupDate: dateError } };
   const normalized = normalizePhone(phone)!;
   try {
-    const ip = await callerIp();
-    if (await requestLocked(ip, normalized))
-      return { status: "error", message: REQUEST_LOCKED };
-    await recordRequest(ip, normalized);
     // Name and type only label a new buyer; an existing client is never changed.
     const client = await findOrRegisterByPhone(normalized, {
       name,
