@@ -33,16 +33,6 @@ export function estimateMinor(kg: number, riceMinorPerKg: number): number {
   return kg * riceMinorPerKg;
 }
 
-/** Public /buy requests allowed per phone and per IP in the window. */
-export const REQUEST_LIMITS = { perPhone: 3, perIp: 10, windowMinutes: 60 };
-
-/** Too many recent requests from this phone or this IP. */
-export function requestLimited(phoneCount: number, ipCount: number): boolean {
-  return (
-    phoneCount >= REQUEST_LIMITS.perPhone || ipCount >= REQUEST_LIMITS.perIp
-  );
-}
-
 /** How far ahead a buyer can ask for a pickup day. */
 export const MAX_PICKUP_DAYS = 30;
 

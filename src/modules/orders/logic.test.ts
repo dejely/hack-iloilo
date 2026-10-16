@@ -10,7 +10,6 @@ import {
   freeKg,
   isRealDate,
   pickupDateError,
-  requestLimited,
   orderStatusTones,
 } from "./logic";
 
@@ -68,14 +67,6 @@ describe("pickupDateError", () => {
     expect(pickupDateError("2026-11-16", "2026-10-16")).toBe(
       "Choose a date within 30 days.",
     );
-  });
-});
-
-describe("requestLimited", () => {
-  it("locks at 3 requests per phone or 10 per IP", () => {
-    expect(requestLimited(2, 9)).toBe(false);
-    expect(requestLimited(3, 0)).toBe(true);
-    expect(requestLimited(0, 10)).toBe(true);
   });
 });
 
