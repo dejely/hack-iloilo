@@ -170,6 +170,9 @@ Every table has `id` (UUID), `created_at` and `updated_at`.
 - `parseDayMonth` takes the next occurrence within `MAX_DAYS_AHEAD` (180 days), so a day that just passed is refused instead of booked a year out. SMS amounts are capped at `MAX_SMS_KG` (200,000 kg).
 - Flood guard: a phone's 61st inbound text in 10 minutes gets one "please wait" reply; later ones are logged without a reply or AI call.
 - Commands with `ai: { description, summary? }` can be read from free text, logged `via_ai`. With a `summary`, the reply asks "you want to {summary}? Is that right?" (an `ai_confirm` prompt); without one (read-only), the command runs right away. AI is optional: with no key, an error or an 8 s timeout, the help reply lists each command's `usage` format.
+- Shared AI registrations may supply `defaults(ctx)` for known sender details, `validate(reading, ctx)` for conditional/server-side field checks, contextual `readReply(text, fields)`, and bounded `maxAsks`. `confirm: true` also collects/validates details for a keyword command without requiring AI.
+- A `CLARIFY` intent asks whether the client is buying rice or selling palay and retains the original message for the next extraction. Qualified yes/no replies and corrections do not answer the old confirmation; validated corrections replace it with a fresh prompt. Read-only variety/price lookups preserve pending questions.
+- Offers and orders store a unique `sms_prompt_id`; claimed confirmations pass that id to persistence. A handler retry returns the original record instead of creating another. Gateway-id deduplication remains in the inbound router.
 - A prompt handler throws `PromptRefusal(reply)` to refuse an answer (e.g. from the wrong phone); the prompt stays open.
 
 **Inbound flow:**
@@ -194,7 +197,7 @@ sequenceDiagram
   S->>G: send(reply)
 ```
 
-A short yes or no ("oo sige", "indi", "ok po", "yesss", "👍") answers the sender's latest open prompt; `YES <ref>` / `NO <ref>` picks one. Prompts expire after 24 hours. `HELP`, `TABANG`, `BULIG`, `INFO`, or a text of only punctuation or emoji, gets the help reply.
+A short, unqualified yes or no ("oo sige", "indi", "ok po", "yesss", "👍") answers the sender's latest open prompt; `YES <ref>` / `NO <ref>` picks one. Prompts expire after 24 hours. `HELP`, `TABANG`, `BULIG`, `INFO`, or a text of only punctuation or emoji, gets the help reply.
 
 **Tests:** keyword parsing, normalization, `FOR`, dd/mm dates, the flood guard; the relay's signature check and dedupe.
 
@@ -264,6 +267,8 @@ Code lives in `src/modules/buying`; the staff page is `/selling` (`/buying` redi
 | Sell    | `SELL <kg> <variety> <dd/mm>` | `SELL 3000 RC222 25/10` |
 
 `SELL` accepts `FOR <phone>`. Kg may be `3,000`, `3000kg` or `3000 kg`; `QUOTE` takes `14,5` or `14 %`. Aliases: `PRESYO` (PRICE), `BALIGYA` (SELL). Accepted offers feed M9. `decideOffer` texts the seller the decision.
+
+`PRICE`, `QUOTE`, `SELL` and `VARIETIES` have AI-readable registrations. `SELL` extracts stated quantity/unit, variety and harvest date; a delivery date is not a harvest date. Quotes extract MC and optional quantity. `src/lib/sms-trade.ts` reads labelled values and relative dates in code; sacks require an explicitly supplied `kgPerSack`, tons convert at 1,000 kg, and fractional or over-200,000 kg totals are refused. Selling resolves the variety and validates the date before confirmation and at save. Existing complete `SELL` keyword commands still save directly; natural-language offers require confirmation.
 
 **Tests:** IRPC's sample form (8,763 kg × ₱21 = ₱184,023), MC above and below 25%, and each deduction.
 
@@ -363,13 +368,17 @@ No tables. **Export:** `capacityByDay(from, to)` returns per day and pool (`drye
 
 Code lives in `src/modules/orders`. See [decision 0003](docs/decisions/0003-buyer-requests-in-scope.md).
 
-| Table         | Columns                                                                                                                                             |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rice_orders` | `ref`, `client_id`, `booked_by_phone`, `kg`, `pickup_date`, `status` (`requested`, `accepted`, `declined`, `cancelled`, `picked_up`), `dispatch_id` |
+| Table         | Columns                                                                                                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rice_orders` | `ref`, `client_id`, `booked_by_phone`, `kg`, `pickup_date`, `status` (`requested`, `accepted`, `declined`, `cancelled`, `picked_up`), `dispatch_id`, nullable `buyer_name`/`buyer_type` request snapshots, unique nullable `sms_prompt_id` |
 
 **Exports:** `createOrder(input)`, `trackedOrder(ref, phone)`, `cancelOrder(order)`, `listOrders(status?)`, `orderStock()`.
 
 **Flow:** `/buy` → `requestRiceOnline` registers or finds the buyer (`kind: buyer`, with their `buyer_type`) and texts the code. The manager accepts or declines on `/buying`; staff cancel, or record the pickup: `pickUpOrder` calls M6 `dispatch()` from a batch in `riceBatchesForSale()` and saves its id as `rice_orders.dispatch_id`. `/buy/track` (code + phone) shows the status and cancels while `requested` or `accepted`; failed lookups share M4's `track_attempts` lock. Requests are limited to 3 per phone and 10 per IP an hour (`request_attempts`). Every change texts the buyer.
+
+**SMS:** `src/modules/orders/sms.ts` registers `BUY <kg> <dd/mm>`, with optional `<buyer_type> NAME <name>`. Both keyword and natural-language requests collect missing buyer name/type and pickup date, then confirm before saving. Known client details are defaults; request snapshots do not overwrite client identity or classification. New SMS senders retain their existing auto-registration behavior. `BUY` is for the sender's own phone; a different `FOR` phone is refused. Replies and numbers use the same order workflow as the web form.
+
+`reserve_sms_rice_request(phone, prompt_id)` is a service-role-only, security-invoker function. It checks the claimed sender-owned BUY prompt, serializes request-attempt reservation per phone with a transaction advisory lock, and enforces three requests per hour including web attempts. An attempt uses `sms:<prompt_id>` in the existing IP column, so a confirmation retry consumes no additional allowance. SMS retains the inbound flood guard and does not use the webhook's IP as a buyer IP. Staff display request name/type snapshots with a client fallback for historical rows.
 
 **Price and stock:** the estimate is `kg × rice_minor_per_kg` (M7); the dispatch (M6) sets the real price. No payment and no stock lock: `/buying` shows free kg = M6 `riceStock()` − accepted kg, and flags open requests above it.
 

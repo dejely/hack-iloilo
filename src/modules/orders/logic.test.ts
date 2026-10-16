@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  orderBuyerDetails,
+  parseBuyArgs,
+  readBuyReply,
+  smsBuyerDefaults,
   canCancel,
   estimateMinor,
   exceedsFree,
@@ -73,4 +77,55 @@ describe("requestLimited", () => {
     expect(requestLimited(3, 0)).toBe(true);
     expect(requestLimited(0, 10)).toBe(true);
   });
+});
+
+describe("SMS rice request fields", () => {
+  it("reads the command without assuming missing buyer details", () => {
+    expect(parseBuyArgs(["100", "25/10"], "2026-10-16")).toEqual({
+      amount: 100,
+      unit: "kg",
+      dayMonth: "25/10",
+    });
+    expect(
+      parseBuyArgs(
+        ["1,000kg", "25/10", "retailer", "NAME", "Maria", "Reyes"],
+        "2026-10-16",
+      ),
+    ).toMatchObject({
+      amount: 1000,
+      buyerType: "retailer",
+      name: "Maria Reyes",
+    });
+    expect(parseBuyArgs(["100", "25/10", "banana"], "2026-10-16")).toBeNull();
+  });
+  it("uses only existing real account details as defaults", () => {
+    expect(smsBuyerDefaults({ name: "SMS 1234", buyer_type: null })).toEqual(
+      {},
+    );
+    expect(smsBuyerDefaults({ name: "Maria", buyer_type: "retailer" })).toEqual(
+      { name: "Maria", buyerType: "retailer" },
+    );
+    expect(readBuyReply("NAME Maria Reyes", "2026-10-16", ["name"])).toEqual({
+      name: "Maria Reyes",
+    });
+    expect(readBuyReply("banana", "2026-10-16", ["name"])).toBeNull();
+  });
+});
+
+it("displays request buyer details with fallback for historical web orders", () => {
+  const client = { name: "Farmer", buyer_type: null };
+  expect(
+    orderBuyerDetails({
+      buyer_name: "Rice Store",
+      buyer_type: "retailer",
+      client,
+    }),
+  ).toEqual({ name: "Rice Store", type: "retailer" });
+  expect(
+    orderBuyerDetails({
+      buyer_name: null,
+      buyer_type: null,
+      client: { name: "Existing Buyer", buyer_type: "wholesaler" },
+    }),
+  ).toEqual({ name: "Existing Buyer", type: "wholesaler" });
 });

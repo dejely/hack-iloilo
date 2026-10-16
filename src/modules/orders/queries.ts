@@ -2,6 +2,12 @@
 // Server-side reads. May call other modules' queries.
 
 import "server-only";
+import { todayManila } from "@/lib/dates";
+import { smsLabel, tradeKg, weightErrors } from "@/lib/sms-trade";
+import { parseDayMonth, fillTemplate } from "@/modules/sms/logic";
+import type { CommandContext } from "@/modules/sms/registry";
+import type { BuySmsInput } from "./sms-schema";
+import { smsBuyerDefaults } from "./logic";
 import { formatDate, formatKg } from "@/lib/format";
 import { newRef } from "@/lib/ref";
 import { db } from "@/lib/supabase/admin";
@@ -15,6 +21,7 @@ import {
   REQUEST_LIMITS,
   requestLimited,
   type OrderStatus,
+  pickupDateError,
 } from "./logic";
 
 export type Order = Database["public"]["Tables"]["rice_orders"]["Row"];
@@ -39,7 +46,19 @@ export async function createOrder(input: {
   bookedByPhone: string;
   kg: number;
   pickupDate: string;
+  buyerName?: string;
+  buyerType?: Database["public"]["Enums"]["buyer_type"];
+  promptId?: string;
 }): Promise<Order> {
+  if (input.promptId) {
+    const { data, error } = await db()
+      .from("rice_orders")
+      .select()
+      .eq("sms_prompt_id", input.promptId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
   const facility = await currentFacility();
   // ref is unique; retry the rare collision with a new one.
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -52,12 +71,24 @@ export async function createOrder(input: {
         booked_by_phone: input.bookedByPhone,
         kg: input.kg,
         pickup_date: input.pickupDate,
+        buyer_name: input.buyerName ?? null,
+        buyer_type: input.buyerType ?? null,
+        sms_prompt_id: input.promptId ?? null,
       })
       .select()
       .single();
     if (!error) return data;
     if (error.code !== "23505")
       throw new Error(`Create rice order: ${error.message}`);
+    if (input.promptId) {
+      const { data: existing, error: lookupError } = await db()
+        .from("rice_orders")
+        .select()
+        .eq("sms_prompt_id", input.promptId)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existing) return existing;
+    }
   }
   throw new Error("Create rice order: could not allocate a unique ref.");
 }
@@ -224,4 +255,75 @@ export async function listOrders(
   const { data, error } = await query;
   if (error) throw new Error(`List rice orders: ${error.message}`);
   return data;
+}
+
+function ricePickupDate(value: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}T00:00:00Z`);
+    if (
+      !Number.isFinite(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== value
+    )
+      return null;
+    return pickupDateError(value, todayManila()) ? null : value;
+  }
+  const date = parseDayMonth(value, todayManila());
+  return date && !pickupDateError(date, todayManila()) ? date : null;
+}
+export async function validateBuyReading(
+  input: BuySmsInput,
+  ctx: CommandContext,
+): Promise<string[]> {
+  const invalid = weightErrors(input);
+  if (!ricePickupDate(input.dayMonth)) invalid.push("dayMonth");
+  const values = { ...smsBuyerDefaults(ctx.client), ...input };
+  if (!values.name) invalid.push("name");
+  if (!values.buyerType) invalid.push("buyerType");
+  return invalid;
+}
+export function describeRiceRequest(input: BuySmsInput): string {
+  return `magbakal sang ${formatKg(tradeKg(input))} bugas, kuha sa ${input.dayMonth}, ngalan ${smsLabel(input.name ?? "")}, buyer ${input.buyerType ?? ""}`;
+}
+export async function buyBySms(
+  input: BuySmsInput,
+  ctx: CommandContext,
+): Promise<string> {
+  if ((await validateBuyReading(input, ctx)).length)
+    return "IRPC: Palihog i-check ang detalye kag i-text liwat ang BUY.";
+  // Look up a saved confirmation before consuming another request attempt.
+  if (ctx.promptId) {
+    const { data, error } = await db()
+      .from("rice_orders")
+      .select()
+      .eq("sms_prompt_id", ctx.promptId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return riceRequestReply(data);
+  }
+  if (!ctx.promptId) return "IRPC: Palihog kumpirmahon anay ang rice request.";
+  const { data: allowed, error: limitError } = await db().rpc(
+    "reserve_sms_rice_request",
+    { p_phone: ctx.phone, p_prompt_id: ctx.promptId },
+  );
+  if (limitError) throw limitError;
+  if (!allowed)
+    return "IRPC: Tatlo lang ka rice request kada oras. Palihog hulat anay kag tilawi liwat.";
+  const order = await createOrder({
+    clientId: ctx.client.id,
+    bookedByPhone: ctx.phone,
+    kg: tradeKg(input),
+    pickupDate: ricePickupDate(input.dayMonth)!,
+    buyerName: input.name ?? String(smsBuyerDefaults(ctx.client).name),
+    buyerType: input.buyerType ?? ctx.client.buyer_type!,
+    promptId: ctx.promptId,
+  });
+  // The inbound router sends the recorded reply once; later decisions use notifyOrder.
+  return riceRequestReply(order);
+}
+function riceRequestReply(order: Order): string {
+  return fillTemplate(orderSms.recorded, {
+    ref: order.ref,
+    kg: formatKg(order.kg),
+    date: formatDate(order.pickup_date),
+  });
 }

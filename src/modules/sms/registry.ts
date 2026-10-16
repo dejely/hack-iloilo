@@ -11,6 +11,8 @@ export type CommandContext = {
   client: Client;
   /** Normalized phone from a trailing `FOR <phone>`. */
   forPhone?: string;
+  /** Claimed AI confirmation; persistence uses it as an idempotency key. */
+  promptId?: string;
 };
 
 export type Command<T, A = T> = {
@@ -25,6 +27,8 @@ export type Command<T, A = T> = {
   parse: (args: string[], keyword: string) => unknown;
   /** Example for the help reply, e.g. `CANCEL K7P2QX`. Defaults to the keyword. */
   usage?: string;
+  /** Collect missing details and confirm even for a deterministic keyword. */
+  confirm?: boolean;
   /** Returns the reply text. */
   handle: (cmd: T, ctx: CommandContext) => Promise<string>;
   /** Lets AI read free text as this command. Omit to keep it keyword-only. */
@@ -48,8 +52,17 @@ export type Command<T, A = T> = {
      * the AI and asked for in a follow-up text; a shared question asks once.
      */
     ask?: Record<string, string>;
+    /** Bounded follow-ups for flows with more fields than booking. */
+    maxAsks?: number;
     /** Reads a follow-up reply without AI, e.g. "1000" as kg; null when unclear. */
-    readReply?: (text: string) => Record<string, unknown> | null;
+    readReply?: (
+      text: string,
+      fields?: readonly string[],
+    ) => Record<string, unknown> | null;
+    /** Server-side defaults from the sender's record, never invented by AI. */
+    defaults?: (ctx: CommandContext) => Record<string, unknown>;
+    /** Missing/invalid conditional fields or data requiring I/O (e.g. variety). */
+    validate?: (reading: A, ctx: CommandContext) => Promise<string[]>;
   };
 };
 

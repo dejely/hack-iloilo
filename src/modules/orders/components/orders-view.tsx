@@ -17,6 +17,7 @@ import { getStaff } from "@/modules/accounts/auth";
 import { buyerTypeLabels } from "@/modules/accounts/logic";
 import { priceOn } from "@/modules/pricing/queries";
 import {
+  orderBuyerDetails,
   canCancel,
   estimateMinor,
   exceedsFree,
@@ -166,13 +167,13 @@ function OrderRow({
   overFree: boolean;
   batches: SaleBatch[];
 }) {
-  const type = order.client?.buyer_type;
+  const { name, type } = orderBuyerDetails(order);
   return (
     <TableRow>
       <TableCell className="font-mono">{order.ref}</TableCell>
       <TableCell>
         <div className="flex flex-col">
-          <span>{order.client?.name ?? "—"}</span>
+          <span>{name}</span>
           {type ? (
             <span className="text-xs text-muted-foreground">
               {buyerTypeLabels[type]}

@@ -2,7 +2,8 @@
 // Server-side reads. May call other modules' queries.
 
 import "server-only";
-import { todayManila } from "@/lib/dates";
+import { tradeKg, weightErrors, type TradeWeight } from "@/lib/sms-trade";
+import { todayManila, addDays } from "@/lib/dates";
 import { formatDate, formatKg, formatMoneySms } from "@/lib/format";
 import { newRef } from "@/lib/ref";
 import { db } from "@/lib/supabase/admin";
@@ -36,6 +37,8 @@ import {
   buyingSms,
 } from "./logic";
 import type { CreateOfferInput, QuoteSmsInput, SellSmsInput } from "./logic";
+import type { z } from "zod";
+import type { sellAiSchema, quoteAiSchema } from "./sms-schema";
 
 export type Offer = Database["public"]["Tables"]["sell_offers"]["Row"];
 export type OfferStatus = Database["public"]["Enums"]["sell_offer_status"];
@@ -47,7 +50,19 @@ export type Purchase = Database["public"]["Tables"]["purchases"]["Row"];
  * action before calling this, and the SMS `SELL` command (#41) reuses it the
  * same way. Offers are inert until a manager accepts.
  */
-export async function createOffer(input: CreateOfferInput): Promise<Offer> {
+export async function createOffer(
+  input: CreateOfferInput,
+  promptId?: string,
+): Promise<Offer> {
+  if (promptId) {
+    const { data, error } = await db()
+      .from("sell_offers")
+      .select()
+      .eq("sms_prompt_id", promptId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
   const facility = await currentFacility();
 
   // ref is unique; retry the rare collision with a new one.
@@ -62,12 +77,22 @@ export async function createOffer(input: CreateOfferInput): Promise<Offer> {
         variety_id: input.varietyId,
         est_kg: input.estKg,
         harvest_date: input.harvestDate,
+        sms_prompt_id: promptId ?? null,
       })
       .select()
       .single();
     if (!error) return data;
     if (error.code !== "23505")
       throw new Error(`Create offer: ${error.message}`);
+    if (promptId) {
+      const { data: existing, error: lookupError } = await db()
+        .from("sell_offers")
+        .select()
+        .eq("sms_prompt_id", promptId)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existing) return existing;
+    }
   }
   throw new Error("Create offer: could not allocate a unique ref.");
 }
@@ -365,7 +390,7 @@ export async function sellBySms(
   const variety = await findVarietyByCode(input.varietyCode);
   if (!variety)
     return fillTemplate(buyingSms.unknownVariety, { code: input.varietyCode });
-  const harvestDate = parseDayMonth(input.dayMonth, todayManila());
+  const harvestDate = sellDate(input.dayMonth);
   if (!harvestDate) return buyingSms.invalidDate;
 
   // FOR records the offer under another client; authority is never granted by it.
@@ -373,13 +398,16 @@ export async function sellBySms(
     ctx.forPhone && ctx.forPhone !== ctx.phone
       ? await findOrRegisterByPhone(ctx.forPhone)
       : ctx.client;
-  const offer = await createOffer({
-    clientId: client.id,
-    varietyId: variety.id,
-    estKg: input.estKg,
-    harvestDate,
-    bookedByPhone: ctx.phone,
-  });
+  const offer = await createOffer(
+    {
+      clientId: client.id,
+      varietyId: variety.id,
+      estKg: input.estKg,
+      harvestDate,
+      bookedByPhone: ctx.phone,
+    },
+    ctx.promptId,
+  );
   return fillTemplate(buyingSms.offerRecorded, {
     ref: offer.ref,
     kg: formatKg(offer.est_kg),
@@ -395,4 +423,52 @@ export async function varietiesBySms(): Promise<string> {
     varieties.map((v) => v.code),
     SMS_MAX_CHARS,
   );
+}
+
+function sellDate(value: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) &&
+      date.toISOString().slice(0, 10) === value &&
+      value >= todayManila() &&
+      value <= addDays(todayManila(), 180)
+      ? value
+      : null;
+  }
+  return parseDayMonth(value, todayManila());
+}
+export async function validateSellReading(
+  input: z.infer<typeof sellAiSchema>,
+): Promise<string[]> {
+  const invalid = weightErrors(input);
+  if (!sellDate(input.dayMonth)) invalid.push("dayMonth");
+  if (!(await findVarietyByCode(input.varietyCode)))
+    invalid.push("varietyCode");
+  return invalid;
+}
+export async function validateQuoteReading(
+  input: z.infer<typeof quoteAiSchema>,
+): Promise<string[]> {
+  if (input.amount === undefined) return [];
+  if (!input.unit) return ["unit"];
+  return weightErrors(input as TradeWeight);
+}
+export function sellReadingArgs(
+  input: z.infer<typeof sellAiSchema>,
+): SellSmsInput {
+  return {
+    estKg: tradeKg(input),
+    varietyCode: input.varietyCode.toUpperCase(),
+    dayMonth: input.dayMonth,
+  };
+}
+export function quoteReadingArgs(
+  input: z.infer<typeof quoteAiSchema>,
+): QuoteSmsInput {
+  return {
+    mc: input.mc,
+    ...(input.amount !== undefined && input.unit
+      ? { kg: tradeKg(input as TradeWeight) }
+      : {}),
+  };
 }
